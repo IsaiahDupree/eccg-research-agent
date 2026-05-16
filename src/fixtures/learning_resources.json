@@ -1,0 +1,179 @@
+{
+  "tracks": [
+    {
+      "slug": "onboarding",
+      "label": "New to event cameras — start here",
+      "description": "30-minute orientation path: what an event camera is, what the data looks like, what software you need.",
+      "items": [
+        {
+          "title": "Event Cameras (in one minute)",
+          "kind": "video",
+          "url": "https://www.youtube.com/watch?v=LauQ6LWTkxM",
+          "duration": "1 min",
+          "source": "iniVation"
+        },
+        {
+          "title": "A Decade of Event-Based Vision: A Survey of 1200 Papers",
+          "kind": "paper",
+          "url": "https://arxiv.org/abs/2402.18221",
+          "duration": "~3 h read",
+          "source": "TPAMI 2026"
+        },
+        {
+          "title": "uzh-rpg/event-based_vision_resources",
+          "kind": "repo",
+          "url": "https://github.com/uzh-rpg/event-based_vision_resources",
+          "duration": "browse",
+          "source": "UZH Robotics & Perception Group"
+        }
+      ]
+    },
+    {
+      "slug": "hardware",
+      "label": "Sensors & hardware",
+      "description": "Get your hands on a sensor (or a simulator) and understand the data it produces.",
+      "items": [
+        {
+          "title": "Prophesee Metavision SDK (Getting Started)",
+          "kind": "docs",
+          "url": "https://docs.prophesee.ai/stable/getting_started.html",
+          "duration": "30 min",
+          "source": "Prophesee"
+        },
+        {
+          "title": "iniVation DV Software",
+          "kind": "docs",
+          "url": "https://docs.inivation.com/",
+          "duration": "30 min",
+          "source": "iniVation"
+        },
+        {
+          "title": "v2e: from video to events",
+          "kind": "repo",
+          "url": "https://github.com/SensorsINI/v2e",
+          "duration": "1 h hands-on",
+          "source": "Sensors INI"
+        }
+      ]
+    },
+    {
+      "slug": "algorithms",
+      "label": "Core algorithms",
+      "description": "Reconstruction, optical flow, SLAM — the workhorse algorithms of event-based vision.",
+      "items": [
+        {
+          "title": "E2VID: events to video reconstruction",
+          "kind": "repo",
+          "url": "https://github.com/uzh-rpg/rpg_e2vid",
+          "duration": "2 h hands-on",
+          "source": "UZH-RPG"
+        },
+        {
+          "title": "Event-Based Optical Flow with EV-FlowNet",
+          "kind": "repo",
+          "url": "https://github.com/daniilidis-group/EV-FlowNet",
+          "duration": "2 h hands-on",
+          "source": "UPenn GRASP"
+        },
+        {
+          "title": "Event-Based SLAM survey",
+          "kind": "paper",
+          "url": "https://arxiv.org/abs/2304.09793",
+          "duration": "1 h read",
+          "source": "Gallego et al."
+        }
+      ]
+    },
+    {
+      "slug": "datasets",
+      "label": "Datasets & benchmarks",
+      "description": "Where to download real recordings and how the community evaluates progress.",
+      "items": [
+        {
+          "title": "DSEC — driving event camera dataset",
+          "kind": "dataset",
+          "url": "https://dsec.ifi.uzh.ch/",
+          "duration": "browse",
+          "source": "UZH"
+        },
+        {
+          "title": "MVSEC — multi-vehicle stereo event camera",
+          "kind": "dataset",
+          "url": "https://daniilidis-group.github.io/mvsec/",
+          "duration": "browse",
+          "source": "UPenn"
+        },
+        {
+          "title": "N-Caltech101, N-MNIST, N-Cars",
+          "kind": "dataset",
+          "url": "https://www.garrickorchard.com/datasets",
+          "duration": "browse",
+          "source": "Garrick Orchard"
+        }
+      ]
+    },
+    {
+      "slug": "neuromorphic",
+      "label": "Neuromorphic compute",
+      "description": "How spiking neural networks run efficiently on neuromorphic chips.",
+      "items": [
+        {
+          "title": "Intel Loihi 2 overview",
+          "kind": "docs",
+          "url": "https://www.intel.com/content/www/us/en/research/neuromorphic-computing-loihi-2-technology-brief.html",
+          "duration": "20 min",
+          "source": "Intel"
+        },
+        {
+          "title": "snnTorch tutorials",
+          "kind": "docs",
+          "url": "https://snntorch.readthedocs.io/en/latest/tutorials/index.html",
+          "duration": "3 h hands-on",
+          "source": "Jason Eshraghian"
+        },
+        {
+          "title": "Lava — open-source neuromorphic framework",
+          "kind": "repo",
+          "url": "https://github.com/lava-nc/lava",
+          "duration": "browse",
+          "source": "Intel Labs"
+        }
+      ]
+    },
+    {
+      "slug": "community",
+      "label": "Community & discovery",
+      "description": "Where the conversation happens beyond GitHub.",
+      "items": [
+        {
+          "title": "arXiv listing: event camera",
+          "kind": "search",
+          "url": "https://arxiv.org/search/?searchtype=all&query=event+camera",
+          "duration": "browse",
+          "source": "arXiv"
+        },
+        {
+          "title": "Google Scholar: Event Camera",
+          "kind": "search",
+          "url": "https://scholar.google.com/scholar?hl=en&as_sdt=0,5&q=Event+Camera",
+          "duration": "browse",
+          "source": "Google Scholar"
+        },
+        {
+          "title": "Neuromorphic Vision Map",
+          "kind": "visualization",
+          "url": "https://hylz-2019.github.io/Neuro_Vision_Map/map.html",
+          "duration": "browse",
+          "source": "hylz-2019"
+        },
+        {
+          "title": "Zotero — reference manager",
+          "kind": "tool",
+          "url": "https://www.zotero.org/",
+          "duration": "install",
+          "source": "Zotero"
+        }
+      ]
+    }
+  ]
+}

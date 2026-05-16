@@ -1,0 +1,26 @@
+node_modules
+.next
+out
+.env
+.env*.local
+!.env.example
+.vercel
+.cache
+.DS_Store
+*.log
+coverage
+.turbo
+.vscode
+.idea
+secrets/
+*.private.json
+
+# Runtime test artifacts produced by smoke scripts — not part of the source.
+/ingest-real.json
+/ingest-result.json
+/ingest-test.json
+/sanity.json
+/feed.xml
+# duplicate of docs/SOURCE_TRANSCRIPT.md
+/delaney-transcript.txt
+/docs/SOURCE_TRANSCRIPT.txt

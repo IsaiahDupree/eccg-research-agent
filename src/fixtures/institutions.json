@@ -1,0 +1,40 @@
+{
+  "institutions": [
+    { "name": "UZH", "long_name": "University of Zurich", "city": "Zurich", "country": "Switzerland", "lon": 8.5417, "lat": 47.3769 },
+    { "name": "ETH", "long_name": "ETH Zürich", "city": "Zurich", "country": "Switzerland", "lon": 8.5450, "lat": 47.3763 },
+    { "name": "TUM", "long_name": "Technical University of Munich", "city": "Munich", "country": "Germany", "lon": 11.5820, "lat": 48.1351 },
+    { "name": "TU Berlin", "long_name": "Technische Universität Berlin", "city": "Berlin", "country": "Germany", "lon": 13.4050, "lat": 52.5200 },
+    { "name": "UPenn", "long_name": "University of Pennsylvania (GRASP)", "city": "Philadelphia", "country": "USA", "lon": -75.1652, "lat": 39.9526 },
+    { "name": "MIT", "long_name": "Massachusetts Institute of Technology", "city": "Cambridge", "country": "USA", "lon": -71.0942, "lat": 42.3601 },
+    { "name": "UMD", "long_name": "University of Maryland", "city": "College Park", "country": "USA", "lon": -76.9378, "lat": 38.9869 },
+    { "name": "IIT", "long_name": "Italian Institute of Technology", "city": "Genoa", "country": "Italy", "lon": 8.9463, "lat": 44.4056 },
+    { "name": "Imperial", "long_name": "Imperial College London", "city": "London", "country": "UK", "lon": -0.1746, "lat": 51.4988 },
+    { "name": "PKU", "long_name": "Peking University", "city": "Beijing", "country": "China", "lon": 116.3105, "lat": 39.9925 },
+    { "name": "Tsinghua", "long_name": "Tsinghua University", "city": "Beijing", "country": "China", "lon": 116.3267, "lat": 40.0030 },
+    { "name": "NUS", "long_name": "National University of Singapore", "city": "Singapore", "country": "Singapore", "lon": 103.7763, "lat": 1.2966 },
+    { "name": "Prophesee", "long_name": "Prophesee", "city": "Paris", "country": "France", "lon": 2.3522, "lat": 48.8566 },
+    { "name": "iniVation", "long_name": "iniVation AG", "city": "Zurich", "country": "Switzerland", "lon": 8.5417, "lat": 47.3769 },
+    { "name": "Samsung Advanced Institute", "long_name": "Samsung Advanced Institute of Technology", "city": "Suwon", "country": "South Korea", "lon": 127.0286, "lat": 37.2636 },
+    { "name": "Intel Labs", "long_name": "Intel Labs (Neuromorphic)", "city": "Hillsboro", "country": "USA", "lon": -122.9885, "lat": 45.5229 }
+  ],
+  "author_affiliations": [
+    { "author": "Davide Scaramuzza", "institution": "UZH" },
+    { "author": "Daniel Gehrig", "institution": "UZH" },
+    { "author": "Henri Rebecq", "institution": "UZH" },
+    { "author": "Mathias Gehrig", "institution": "UZH" },
+    { "author": "Daniel Cremers", "institution": "TUM" },
+    { "author": "Lukas Koestler", "institution": "TUM" },
+    { "author": "Guillermo Gallego", "institution": "TU Berlin" },
+    { "author": "Tobi Delbruck", "institution": "ETH" },
+    { "author": "Yuhuang Hu", "institution": "iniVation" },
+    { "author": "Chiara Bartolozzi", "institution": "IIT" },
+    { "author": "Antonio Vitale", "institution": "IIT" },
+    { "author": "Cornelia Fermüller", "institution": "UMD" },
+    { "author": "Tiejun Huang", "institution": "PKU" },
+    { "author": "Zhe Wang", "institution": "PKU" },
+    { "author": "Yiming Zhao", "institution": "PKU" },
+    { "author": "Wei Liu", "institution": "PKU" },
+    { "author": "Damien Joubert", "institution": "Prophesee" },
+    { "author": "Garrick Orchard", "institution": "Intel Labs" }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "name": "eccg-research-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Research aggregator for the Event Camera Community Group (ECCG) — pulls papers, code, and demos from arXiv, Semantic Scholar, OpenAlex, GitHub; ranks by citation velocity + ECCG relevance; renders digests.",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build --turbopack",
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "seed": "tsx scripts/seed.ts",
+    "refresh": "tsx scripts/refresh.ts",
+    "ingest:spreadsheet": "node scripts/ingest-spreadsheet.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "@radix-ui/react-dialog": "^1.1.2",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-tabs": "^1.1.1",
+    "@radix-ui/react-tooltip": "^1.1.4",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.4.0",
+    "fast-xml-parser": "^4.5.0",
+    "lucide-react": "^0.460.0",
+    "next": "16.2.2",
+    "openai": "^4.80.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.5.5",
+    "xlsx": "^0.18.5",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.1",
+    "@vitest/coverage-v8": "^2.1.8",
+    "babel-plugin-react-compiler": "^19.0.0-beta",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
