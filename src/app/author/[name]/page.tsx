@@ -5,6 +5,7 @@ import { ExternalLink, GitBranch, Users } from "lucide-react";
 import { loadSeedPipeline } from "@/lib/seed";
 import { PaperRow } from "@/components/PaperRow";
 import { Badge } from "@/components/Badge";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { getIntentCounts } from "@/lib/citations";
 import { computeAuthorStats, normaliseAuthor as normaliseName } from "@/lib/author_stats";
 
@@ -91,15 +92,40 @@ export default async function AuthorPage({ params }: Params) {
       }
     : null;
 
+  const SITE_URL =
+    process.env.SITE_URL?.trim() || "https://eccg-research-agent.vercel.app";
+  const personJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: display,
+    url: `${SITE_URL}/author/${encodeURIComponent(display)}`,
+    description: `${papers.length} papers in the ECCG event-camera corpus, ${totalCitations.toLocaleString()} total citations.`,
+    knowsAbout: topCategories.map(([c]) => c),
+    affiliation: topVenues[0]?.[0]
+      ? { "@type": "Organization", name: topVenues[0][0] }
+      : undefined,
+    // 'works' isn't standard but `subjectOf` with CreativeWork array is.
+    subjectOf: papers.slice(0, 25).map((p) => ({
+      "@type": "ScholarlyArticle",
+      "@id": `${SITE_URL}/paper/${encodeURIComponent(p.paper.id)}`,
+      name: p.paper.title,
+    })),
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+      />
+      <Breadcrumbs
+        trail={[
+          { label: "Home", href: "/" },
+          { label: "Authors" },
+          { label: display },
+        ]}
+      />
       <section className="mb-6">
-        <Link
-          href="/"
-          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← Back to list
-        </Link>
         <h1 className="mt-3 flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <Users className="h-5 w-5" aria-hidden /> {display}
         </h1>

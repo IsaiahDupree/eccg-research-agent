@@ -5,6 +5,46 @@ import { TrendingStrip, type TrendingItem } from "@/components/TrendingStrip";
 
 export const dynamic = "force-static";
 
+const SITE_URL =
+  process.env.SITE_URL?.trim() || "https://eccg-research-agent.vercel.app";
+
+// Schema.org WebSite + Organization + SearchAction. The WebSite block
+// enables Google's "sitelinks search box" SERP feature; the Organization
+// block establishes the entity behind the aggregator so SERPs can build
+// a knowledge-panel-style result.
+const HOMEPAGE_JSONLD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: "ECCG Research Agent",
+      description:
+        "Continuously-updated digest of event-based-vision and neuromorphic-compute research, ranked on a 9-axis rubric and replication-strength citations.",
+      inLanguage: "en",
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "Event Camera Community Group (ECCG)",
+      alternateName: "ECCG",
+      url: SITE_URL,
+      description:
+        "Research community tracking advances in event cameras, event-based vision, and neuromorphic computing.",
+      sameAs: ["https://github.com/uzh-rpg/event-based_vision_resources"],
+    },
+  ],
+};
+
 export default function HomePage() {
   const result = loadSeedPipeline();
   const topVelocity = [...result.raw.velocities].sort(
@@ -33,6 +73,10 @@ export default function HomePage() {
     .slice(0, 3);
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(HOMEPAGE_JSONLD) }}
+      />
       <section className="mb-8">
         <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
           Event-camera research, ranked.

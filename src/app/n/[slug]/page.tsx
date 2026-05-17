@@ -6,6 +6,7 @@ import { loadSeedPipeline } from "@/lib/seed";
 import { NICHES, findNiche, matchesNiche } from "@/lib/niches";
 import { categoryLabel, formatMonthsAgo } from "@/lib/utils";
 import { Badge } from "@/components/Badge";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { NicheCookieSetter } from "./NicheCookieSetter";
 import gapsRaw from "@/fixtures/eccg_gaps.json" with { type: "json" };
 
@@ -74,9 +75,48 @@ export default async function NichePage({ params }: Params) {
     return niche.core_keywords.some((k) => text.includes(k.toLowerCase()));
   });
 
+  const SITE_URL =
+    process.env.SITE_URL?.trim() || "https://eccg-research-agent.vercel.app";
+  const collectionJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "@id": `${SITE_URL}/n/${niche.slug}`,
+    url: `${SITE_URL}/n/${niche.slug}`,
+    name: `${niche.label} — ECCG Research Agent`,
+    description: niche.description,
+    keywords: niche.core_keywords.join(", "),
+    isPartOf: { "@id": `${SITE_URL}/#website` },
+    about: {
+      "@type": "Thing",
+      name: niche.label,
+      description: niche.description,
+    },
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: inNiche.length,
+      itemListElement: topByScore.slice(0, 10).map((s, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        url: `${SITE_URL}/paper/${encodeURIComponent(s.paper.id)}`,
+        name: s.paper.title,
+      })),
+    },
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }}
+      />
       <NicheCookieSetter slug={niche.slug} />
+      <Breadcrumbs
+        trail={[
+          { label: "Home", href: "/" },
+          { label: "Niches" },
+          { label: niche.label },
+        ]}
+      />
       <section className="mb-6">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
           niche

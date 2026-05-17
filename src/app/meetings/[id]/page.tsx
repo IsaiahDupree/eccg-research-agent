@@ -5,6 +5,7 @@ import { loadSeedMeetings } from "@/lib/seed_meetings";
 import { loadSeedPipeline } from "@/lib/seed";
 import { fixtureMeetingDigest } from "@/lib/llm/meetings";
 import { Badge } from "@/components/Badge";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export const dynamicParams = true;
 
@@ -66,15 +67,44 @@ export default async function MeetingDetail({ params }: Params) {
   // ("Name:") so the reader gets a paragraphed view.
   const segments = splitTranscript(meeting.transcript);
 
+  const SITE_URL =
+    process.env.SITE_URL?.trim() || "https://eccg-research-agent.vercel.app";
+  const eventJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: meeting.title,
+    startDate: meeting.held_at,
+    eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode",
+    eventStatus: "https://schema.org/EventScheduled",
+    description: digest.tldr,
+    location: {
+      "@type": "VirtualLocation",
+      url: `${SITE_URL}/meetings/${meeting.id}`,
+    },
+    organizer: {
+      "@type": "Organization",
+      name: "Event Camera Community Group",
+      url: SITE_URL,
+    },
+    attendee: meeting.attendees.map((a) => ({ "@type": "Person", name: a.name })),
+    inLanguage: meeting.language ?? "en",
+    url: `${SITE_URL}/meetings/${meeting.id}`,
+  };
+
   return (
     <article className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }}
+      />
       <div className="min-w-0">
-        <Link
-          href="/meetings"
-          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← All meetings
-        </Link>
+        <Breadcrumbs
+          trail={[
+            { label: "Home", href: "/" },
+            { label: "Meetings", href: "/meetings" },
+            { label: meeting.title },
+          ]}
+        />
         <h1 className="mt-3 text-2xl font-semibold leading-tight tracking-tight">
           {meeting.title}
         </h1>

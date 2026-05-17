@@ -12,6 +12,7 @@ import { NotesPanel } from "@/components/NotesPanel";
 import { VoteWidget } from "@/components/VoteWidget";
 import { CitationVelocityChart } from "@/components/CitationVelocityChart";
 import { CompareWithLibraryButton } from "@/components/CompareWithLibraryButton";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { VoteReasonsPanel } from "@/components/VoteReasonsPanel";
 import { getCitationEdges, getIntentCounts } from "@/lib/citations";
 import { getMeetingMentionsFor } from "@/lib/meeting_mentions";
@@ -136,6 +137,43 @@ export default async function PaperPage({ params }: Params) {
   const SITE_URL =
     process.env.SITE_URL?.trim() || "https://eccg-research-agent.vercel.app";
 
+  // "More from this venue" + "More by the lead author" cross-links.
+  // Boosts internal PageRank flow and helps LLM crawlers cluster topically.
+  const moreFromVenue = venueName
+    ? result.scored
+        .filter(
+          (s) =>
+            s.paper.id !== scored.paper.id && s.paper.venue?.name === venueName,
+        )
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5)
+    : [];
+  const leadAuthor = scored.paper.authors[0]?.name;
+  const moreByLead = leadAuthor
+    ? result.scored
+        .filter(
+          (s) =>
+            s.paper.id !== scored.paper.id &&
+            s.paper.authors.some((a) => a.name === leadAuthor),
+        )
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5)
+    : [];
+
+  const breadcrumbTrail = [
+    { label: "Home", href: "/" },
+    { label: "Papers", href: "/" },
+    ...(scored.paper.eccg_category
+      ? [
+          {
+            label: categoryLabel(scored.paper.eccg_category),
+            href: `/?category=${encodeURIComponent(scored.paper.eccg_category)}`,
+          },
+        ]
+      : []),
+    { label: scored.paper.title },
+  ];
+
   // Schema.org ScholarlyArticle markup. Picked up by Google Scholar,
   // SERP rich-result builders, and any LLM crawler that knows JSON-LD —
   // gives them the canonical machine-readable view of this page.
@@ -203,12 +241,7 @@ export default async function PaperPage({ params }: Params) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <div className="min-w-0">
-        <Link
-          href="/"
-          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← Back to list
-        </Link>
+        <Breadcrumbs trail={breadcrumbTrail} />
         <h1 className="mt-3 text-2xl font-semibold leading-tight tracking-tight">
           {scored.paper.title}
         </h1>
@@ -522,7 +555,19 @@ export default async function PaperPage({ params }: Params) {
 
         {related.length > 0 && (
           <div className="rounded-lg border p-4">
-            <h3 className="text-sm font-medium">Related in this category</h3>
+            <h3 className="text-sm font-medium">
+              Related{" "}
+              {scored.paper.eccg_category ? (
+                <Link
+                  href={`/?category=${encodeURIComponent(scored.paper.eccg_category)}`}
+                  className="text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  {categoryLabel(scored.paper.eccg_category)}
+                </Link>
+              ) : (
+                "papers"
+              )}
+            </h3>
             <ul className="mt-2 space-y-2 text-sm">
               {related.map((r) => (
                 <li key={r.paper.id}>
@@ -536,6 +581,60 @@ export default async function PaperPage({ params }: Params) {
                     score {r.total.toFixed(0)} ·{" "}
                     {r.paper.citation_count} cit ·{" "}
                     {formatMonthsAgo(r.paper.months_since_publish)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {moreByLead.length > 0 && leadAuthor && (
+          <div className="rounded-lg border p-4">
+            <h3 className="text-sm font-medium">
+              More by{" "}
+              <Link
+                href={`/author/${encodeURIComponent(leadAuthor)}`}
+                className="hover:underline"
+              >
+                {leadAuthor}
+              </Link>
+            </h3>
+            <ul className="mt-2 space-y-2 text-sm">
+              {moreByLead.map((r) => (
+                <li key={r.paper.id}>
+                  <Link
+                    href={`/paper/${encodeURIComponent(r.paper.id)}`}
+                    className="line-clamp-2 hover:underline"
+                  >
+                    {r.paper.title}
+                  </Link>
+                  <div className="text-xs text-muted-foreground">
+                    {r.paper.venue?.name ?? "preprint"} ·{" "}
+                    {new Date(r.paper.published_at).getFullYear()}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {moreFromVenue.length > 0 && venueName && (
+          <div className="rounded-lg border p-4">
+            <h3 className="text-sm font-medium">
+              More from <span className="font-mono text-xs">{venueName}</span>
+            </h3>
+            <ul className="mt-2 space-y-2 text-sm">
+              {moreFromVenue.map((r) => (
+                <li key={r.paper.id}>
+                  <Link
+                    href={`/paper/${encodeURIComponent(r.paper.id)}`}
+                    className="line-clamp-2 hover:underline"
+                  >
+                    {r.paper.title}
+                  </Link>
+                  <div className="text-xs text-muted-foreground">
+                    score {r.total.toFixed(0)} ·{" "}
+                    {new Date(r.paper.published_at).getFullYear()}
                   </div>
                 </li>
               ))}
