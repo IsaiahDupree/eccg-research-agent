@@ -114,6 +114,12 @@ export default function RootLayout({
                 Upload
               </Link>
               <Link
+                href="/settings"
+                className="rounded-md px-2.5 py-1.5 hover:bg-muted"
+              >
+                Settings
+              </Link>
+              <Link
                 href="/about"
                 className="rounded-md px-2.5 py-1.5 hover:bg-muted"
               >

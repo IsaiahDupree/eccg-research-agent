@@ -36,10 +36,22 @@ export function PaperRow({ scored, rank, displayScore, scoreSubLabel }: PaperRow
         <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
           {paper.abstract}
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span className="truncate">
-            {paper.authors.slice(0, 3).map((a) => a.name).join(", ")}
-            {paper.authors.length > 3 && ` +${paper.authors.length - 3}`}
+        <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex flex-wrap items-center gap-x-1">
+            {paper.authors.slice(0, 3).map((a, i) => (
+              <span key={`${a.name}-${i}`}>
+                <Link
+                  href={`/author/${encodeURIComponent(a.name)}`}
+                  className="hover:underline"
+                >
+                  {a.name}
+                </Link>
+                {i < Math.min(3, paper.authors.length) - 1 && ","}
+              </span>
+            ))}
+            {paper.authors.length > 3 && (
+              <span className="text-muted-foreground"> +{paper.authors.length - 3}</span>
+            )}
           </span>
           <span aria-hidden>·</span>
           <span>{paper.venue?.name ?? "preprint"}</span>

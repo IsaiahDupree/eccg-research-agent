@@ -62,8 +62,20 @@ export default async function PaperPage({ params }: Params) {
         <h1 className="mt-3 text-2xl font-semibold leading-tight tracking-tight">
           {scored.paper.title}
         </h1>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <span>{scored.paper.authors.map((a) => a.name).join(", ")}</span>
+        <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-muted-foreground">
+          <span className="inline-flex flex-wrap items-center gap-x-1">
+            {scored.paper.authors.map((a, i) => (
+              <span key={`${a.name}-${i}`}>
+                <Link
+                  href={`/author/${encodeURIComponent(a.name)}`}
+                  className="hover:underline"
+                >
+                  {a.name}
+                </Link>
+                {i < scored.paper.authors.length - 1 && ","}
+              </span>
+            ))}
+          </span>
           <span aria-hidden>·</span>
           <span>{scored.paper.venue?.name ?? "arXiv preprint"}</span>
           <span aria-hidden>·</span>
