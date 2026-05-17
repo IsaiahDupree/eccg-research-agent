@@ -20,6 +20,7 @@ secrets/
 /ingest-result.json
 /ingest-test.json
 /sanity.json
+/refresh-result.json
 /feed.xml
 # duplicate of docs/SOURCE_TRANSCRIPT.md
 /delaney-transcript.txt
