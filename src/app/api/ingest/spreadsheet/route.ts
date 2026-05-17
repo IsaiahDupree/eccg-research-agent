@@ -14,11 +14,9 @@
 import { NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
 import { assignRelevance } from "@/lib/analysis/relevance";
+import { CUSTOM_CORPUS_STATE } from "@/lib/custom_corpus";
 import { readState, writeState } from "@/lib/google/state";
 import type { Paper } from "@/lib/models";
-
-/** Drive state key for user-uploaded corpus additions. */
-const CUSTOM_CORPUS_STATE = "custom-corpus";
 
 interface UploadedRecord {
   paper: Paper;
@@ -26,6 +24,7 @@ interface UploadedRecord {
   uploaded_by: string;
   uploaded_at: string;
   source_file: string;
+  status?: "pending" | "approved" | "rejected";
 }
 
 export const runtime = "nodejs";
@@ -206,6 +205,9 @@ export async function POST(req: Request) {
           uploaded_by: uploader,
           uploaded_at: new Date().toISOString(),
           source_file: file.name,
+          // User-uploaded papers default to approved — the team made an
+          // explicit decision to import them.
+          status: "approved",
         }));
       if (additions.length > 0) {
         await writeState(CUSTOM_CORPUS_STATE, [...additions, ...existing]);

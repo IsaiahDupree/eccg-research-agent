@@ -2,20 +2,22 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Trophy, Flame, AlertTriangle } from "lucide-react";
+import { Trophy, Flame, AlertTriangle, GitBranch } from "lucide-react";
 import { Badge } from "@/components/Badge";
 import { VoteWidget } from "@/components/VoteWidget";
 import { loadSeedPipelineClient } from "@/lib/seed_client";
 import { useVotes, hotness } from "@/lib/votes_client";
+import { getIntentCounts } from "@/lib/citations";
 import { categoryLabel, formatMonthsAgo } from "@/lib/utils";
 import type { ScoredPaper } from "@/lib/models";
 import { cn } from "@/lib/utils";
 
-type Mode = "top" | "hot" | "controversial";
+type Mode = "top" | "hot" | "controversial" | "influence";
 
 const MODES: { mode: Mode; label: string; Icon: typeof Trophy; help: string }[] = [
   { mode: "top",           label: "Top",           Icon: Trophy,         help: "Highest net votes" },
   { mode: "hot",           label: "Hot",           Icon: Flame,          help: "Reddit-style: vote magnitude × recency" },
+  { mode: "influence",     label: "Influence",     Icon: GitBranch,      help: "Community votes + in-corpus replication-strength citations" },
   { mode: "controversial", label: "Controversial", Icon: AlertTriangle,  help: "Most up AND down votes — points of disagreement" },
 ];
 
@@ -31,10 +33,40 @@ export default function LeaderboardPage() {
   const byId = useMemo(() => new Map(scored.map((s) => [s.paper.id, s])), [scored]);
 
   const ranked = useMemo(() => {
+    // Influence mode considers every paper in the corpus, not just papers
+    // that have been voted on — because in-corpus replication is its own
+    // signal even before the team casts votes.
+    if (mode === "influence") {
+      const rows = scored
+        .map((s) => {
+          const v = votes[s.paper.id] ?? { up: 0, down: 0, net: 0 };
+          const ic = getIntentCounts(s.paper.id);
+          const inf =
+            ic.replication * 2 +
+            ic.total * 0.5 +
+            v.net * 1.5;
+          return {
+            scored: s,
+            up: v.up,
+            down: v.down,
+            net: v.net,
+            hot: hotness(v.net, s.paper.months_since_publish),
+            controversy: Math.min(v.up, v.down) * Math.log2(v.up + v.down + 1),
+            replication: ic.replication,
+            cited_by: ic.total,
+            influence: inf,
+          };
+        })
+        .filter((r) => r.influence > 0)
+        .sort((a, b) => b.influence - a.influence);
+      return rows;
+    }
+
     const rows = Object.entries(votes)
       .map(([id, v]) => {
         const s = byId.get(id);
         if (!s) return null;
+        const ic = getIntentCounts(id);
         return {
           scored: s,
           up: v.up,
@@ -42,6 +74,9 @@ export default function LeaderboardPage() {
           net: v.net,
           hot: hotness(v.net, s.paper.months_since_publish),
           controversy: Math.min(v.up, v.down) * Math.log2(v.up + v.down + 1),
+          replication: ic.replication,
+          cited_by: ic.total,
+          influence: 0,
         };
       })
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
@@ -50,7 +85,7 @@ export default function LeaderboardPage() {
     else if (mode === "hot") rows.sort((a, b) => b.hot - a.hot);
     else rows.sort((a, b) => b.controversy - a.controversy);
     return rows;
-  }, [votes, byId, mode]);
+  }, [scored, votes, byId, mode]);
 
   return (
     <>
@@ -143,6 +178,16 @@ export default function LeaderboardPage() {
                   {mode === "hot" && <div>hot {row.hot.toFixed(2)}</div>}
                   {mode === "controversial" && (
                     <div>controversy {row.controversy.toFixed(1)}</div>
+                  )}
+                  {mode === "influence" && (
+                    <div className="space-y-0.5">
+                      <div className="text-foreground">
+                        <strong>{row.influence.toFixed(1)}</strong>
+                      </div>
+                      <div>
+                        in {row.cited_by} · repl {row.replication}
+                      </div>
+                    </div>
                   )}
                   {mode === "top" && row.net !== 0 && (
                     <div>

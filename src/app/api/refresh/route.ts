@@ -13,15 +13,7 @@ const SITE_URL = process.env.SITE_URL ?? "https://eccg-research-agent.vercel.app
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 min budget — arXiv batches + retries
 
-const CUSTOM_CORPUS_STATE = "custom-corpus";
-
-interface UploadedRecord {
-  paper: Paper;
-  score_base: number;
-  uploaded_by: string;
-  uploaded_at: string;
-  source_file: string;
-}
+import { CUSTOM_CORPUS_STATE, type UploadedRecord } from "@/lib/custom_corpus";
 
 /**
  * Daily refresh — runs via Vercel cron (vercel.json) at 06:00 UTC.
@@ -80,6 +72,9 @@ export async function GET(req: Request) {
         uploaded_by: "cron",
         uploaded_at: new Date().toISOString(),
         source_file: "arxiv-cron",
+        // Cron-discovered papers land in the review queue. /review is where
+        // the team approves them into the ranked corpus.
+        status: "pending",
       }));
 
     if (additions.length > 0) {

@@ -12,6 +12,7 @@ import {
 import { getIdentity } from "@/lib/identity";
 import { cn } from "@/lib/utils";
 import { DEFAULT_RUBRIC } from "@/lib/scoring/weights";
+import { SignInChip } from "@/components/SignInChip";
 
 const ORDER: (keyof RubricWeightOverrides)[] = [
   "eccg_relevance",
@@ -81,12 +82,14 @@ export default function SettingsPage() {
           shared Drive state — your team sees the same weights you set here.
         </p>
         <p className="mt-2 max-w-2xl text-xs text-muted-foreground">
-          Identity: <strong>{typeof window !== "undefined" ? getIdentity().alias : "—"}</strong>{" "}
-          · Sum of weights: <strong className="tabular-nums">{total}</strong>{" "}
+          alias: <strong>{me}</strong> · sum: <strong className="tabular-nums">{total}</strong>{" "}
           {total !== 100 && total > 0 && (
-            <em>(non-100 totals are fine — scores are re-normalised to 0–100)</em>
+            <em>(non-100 totals are fine — scores are re-normalised)</em>
           )}
         </p>
+        <div className="mt-2">
+          <SignInChip redirect="/settings" />
+        </div>
       </section>
 
       {ready && isReadOnly && (

@@ -14,6 +14,7 @@ interface UploadedRecord {
   uploaded_by: string;
   uploaded_at: string;
   source_file: string;
+  status?: "pending" | "approved" | "rejected";
 }
 
 let cache: UploadedRecord[] | null = null;

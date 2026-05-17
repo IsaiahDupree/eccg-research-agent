@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isEditor, isEditorsEnforced, listEditors } from "@/lib/editors";
+import { readSessionFromRequest } from "@/lib/auth/session";
+import { isEditor, isEditorsEnforced, listEditors, listEditorEmails } from "@/lib/editors";
 import { readState, writeState } from "@/lib/google/state";
 import { DEFAULT_RUBRIC } from "@/lib/scoring/weights";
 
@@ -24,6 +25,7 @@ export async function GET() {
     updated_at: stored?.updated_at ?? null,
     editors_enforced: isEditorsEnforced(),
     editors: listEditors(),
+    editor_emails: listEditorEmails(),
   });
 }
 
@@ -31,13 +33,15 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as Partial<WeightsRecord> & {
     user?: string;
   };
-  const alias = (body.user ?? "anonymous").toString().slice(0, 40);
-  if (!isEditor(alias)) {
+  const session = readSessionFromRequest(req);
+  const alias = (body.user ?? session?.email ?? "anonymous").toString().slice(0, 80);
+  if (!isEditor(alias, session?.email)) {
     return NextResponse.json(
       {
         ok: false,
-        error: `alias '${alias}' is not on the editor allowlist`,
+        error: `'${alias}' is not on the editor allowlist`,
         editors: listEditors(),
+        editor_emails: listEditorEmails(),
       },
       { status: 403 },
     );
@@ -50,7 +54,7 @@ export async function POST(req: Request) {
   }
   const record: WeightsRecord = {
     weights: clean,
-    updated_by: alias,
+    updated_by: session?.email ?? alias,
     updated_at: new Date().toISOString(),
   };
   await writeState(STATE_NAME, record);

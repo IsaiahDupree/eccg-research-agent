@@ -1,25 +1,40 @@
 /**
  * Returns user-uploaded papers persisted to Drive state.
  * Read-only — uploads happen via /api/ingest/spreadsheet?persist=true.
+ * Pending-review records are hidden by default; pass ?include=pending or
+ * ?status=all|pending|rejected to see them.
  */
 
 import { NextResponse } from "next/server";
-import { readState } from "@/lib/google/state";
-import type { Paper } from "@/lib/models";
-
-const STATE_NAME = "custom-corpus";
-
-interface UploadedRecord {
-  paper: Paper;
-  score_base: number;
-  uploaded_by: string;
-  uploaded_at: string;
-  source_file: string;
-}
+import { loadCustomCorpus, statusOf } from "@/lib/custom_corpus";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const records = await readState<UploadedRecord[]>(STATE_NAME, []);
-  return NextResponse.json({ count: records.length, records });
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const include = url.searchParams.get("include");
+  const status = url.searchParams.get("status");
+  const all = await loadCustomCorpus();
+  let records = all;
+  if (status === "all") {
+    // everything
+  } else if (status === "pending") {
+    records = all.filter((r) => statusOf(r) === "pending");
+  } else if (status === "rejected") {
+    records = all.filter((r) => statusOf(r) === "rejected");
+  } else if (include === "pending") {
+    records = all.filter((r) => statusOf(r) !== "rejected");
+  } else {
+    records = all.filter((r) => statusOf(r) === "approved");
+  }
+  return NextResponse.json({
+    count: records.length,
+    total: all.length,
+    counts: {
+      approved: all.filter((r) => statusOf(r) === "approved").length,
+      pending: all.filter((r) => statusOf(r) === "pending").length,
+      rejected: all.filter((r) => statusOf(r) === "rejected").length,
+    },
+    records,
+  });
 }

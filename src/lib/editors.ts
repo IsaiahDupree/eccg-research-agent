@@ -11,22 +11,39 @@
  * For real identity, add magic-link auth (deferred).
  */
 
-const env = (process.env.EDITORS ?? "").trim();
-const ALLOW: Set<string> | null =
-  env.length === 0
-    ? null
-    : new Set(env.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
+const aliasesEnv = (process.env.EDITORS ?? "").trim();
+const emailsEnv = (process.env.EDITORS_EMAILS ?? "").trim();
 
-export function isEditor(alias: string | null | undefined): boolean {
-  if (ALLOW === null) return true; // unrestricted
-  if (!alias) return false;
-  return ALLOW.has(alias.toLowerCase());
+const ALIAS_ALLOW: Set<string> | null =
+  aliasesEnv.length === 0
+    ? null
+    : new Set(aliasesEnv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
+
+const EMAIL_ALLOW: Set<string> | null =
+  emailsEnv.length === 0
+    ? null
+    : new Set(emailsEnv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
+
+export function isEditor(
+  alias: string | null | undefined,
+  verifiedEmail?: string | null,
+): boolean {
+  // When NEITHER allowlist is set, anyone is an editor (default V1 mode).
+  if (ALIAS_ALLOW === null && EMAIL_ALLOW === null) return true;
+  // A verified email match wins over the alias check.
+  if (verifiedEmail && EMAIL_ALLOW?.has(verifiedEmail.toLowerCase())) return true;
+  if (alias && ALIAS_ALLOW?.has(alias.toLowerCase())) return true;
+  return false;
 }
 
 export function isEditorsEnforced(): boolean {
-  return ALLOW !== null;
+  return ALIAS_ALLOW !== null || EMAIL_ALLOW !== null;
 }
 
 export function listEditors(): string[] {
-  return ALLOW ? Array.from(ALLOW) : [];
+  return ALIAS_ALLOW ? Array.from(ALIAS_ALLOW) : [];
+}
+
+export function listEditorEmails(): string[] {
+  return EMAIL_ALLOW ? Array.from(EMAIL_ALLOW) : [];
 }

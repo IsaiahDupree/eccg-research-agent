@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { HeaderSearch } from "@/components/HeaderSearch";
 import { IdentityChip } from "@/components/IdentityChip";
+import { NicheChip } from "@/components/NicheChip";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,6 +46,7 @@ export default function RootLayout({
             <Suspense fallback={null}>
               <HeaderSearch />
             </Suspense>
+            <NicheChip />
             <IdentityChip />
             <nav className="ml-auto flex flex-wrap items-center gap-1 text-sm">
               <Link href="/" className="rounded-md px-2.5 py-1.5 hover:bg-muted">
@@ -102,6 +104,12 @@ export default function RootLayout({
                 Influential
               </Link>
               <Link
+                href="/gaps"
+                className="rounded-md px-2.5 py-1.5 hover:bg-muted"
+              >
+                Gaps
+              </Link>
+              <Link
                 href="/compare"
                 className="rounded-md px-2.5 py-1.5 hover:bg-muted"
               >
@@ -118,6 +126,12 @@ export default function RootLayout({
                 className="rounded-md px-2.5 py-1.5 hover:bg-muted"
               >
                 Upload
+              </Link>
+              <Link
+                href="/review"
+                className="rounded-md px-2.5 py-1.5 hover:bg-muted"
+              >
+                Review
               </Link>
               <Link
                 href="/settings"
