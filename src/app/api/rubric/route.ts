@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isEditor, isEditorsEnforced, listEditors } from "@/lib/editors";
 import { readState, writeState } from "@/lib/google/state";
 import { DEFAULT_RUBRIC } from "@/lib/scoring/weights";
 
@@ -21,6 +22,8 @@ export async function GET() {
     weights: { ...defaults, ...(stored?.weights ?? {}) },
     updated_by: stored?.updated_by ?? null,
     updated_at: stored?.updated_at ?? null,
+    editors_enforced: isEditorsEnforced(),
+    editors: listEditors(),
   });
 }
 
@@ -28,6 +31,17 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as Partial<WeightsRecord> & {
     user?: string;
   };
+  const alias = (body.user ?? "anonymous").toString().slice(0, 40);
+  if (!isEditor(alias)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `alias '${alias}' is not on the editor allowlist`,
+        editors: listEditors(),
+      },
+      { status: 403 },
+    );
+  }
   const raw = body.weights ?? {};
   const clean: Record<string, number> = {};
   for (const c of DEFAULT_RUBRIC.categories) {
@@ -36,7 +50,7 @@ export async function POST(req: Request) {
   }
   const record: WeightsRecord = {
     weights: clean,
-    updated_by: (body.user ?? "anonymous").toString().slice(0, 40),
+    updated_by: alias,
     updated_at: new Date().toISOString(),
   };
   await writeState(STATE_NAME, record);

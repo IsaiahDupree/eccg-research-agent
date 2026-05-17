@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ExternalLink, Users } from "lucide-react";
 import { loadSeedPipeline } from "@/lib/seed";
 import { PaperRow } from "@/components/PaperRow";
+import { getIntentCounts } from "@/lib/citations";
 
 export const dynamicParams = true;
 
@@ -50,12 +51,21 @@ export default async function AuthorPage({ params }: Params) {
   const venues = new Map<string, number>();
   const categories = new Map<string, number>();
   let totalCitations = 0;
+  let totalInCorpusCitedBy = 0;
+  let totalReplication = 0;
+  let totalBackground = 0;
+  let papersWithReplication = 0;
   for (const s of papers) {
     const v = s.paper.venue?.name ?? "preprint";
     venues.set(v, (venues.get(v) ?? 0) + 1);
     const c = s.paper.eccg_category ?? "unclassified";
     categories.set(c, (categories.get(c) ?? 0) + 1);
     totalCitations += s.paper.citation_count;
+    const ic = getIntentCounts(s.paper.id);
+    totalInCorpusCitedBy += ic.total;
+    totalReplication += ic.methodology + ic.result + ic.extensionMethodology;
+    totalBackground += ic.background;
+    if (ic.replication > 0) papersWithReplication++;
   }
   const topVenues = Array.from(venues.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4);
   const topCategories = Array.from(categories.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4);
@@ -63,6 +73,11 @@ export default async function AuthorPage({ params }: Params) {
     .map((s) => s.paper.citation_count)
     .sort((a, b) => b - a)
     .filter((c, i) => c >= i + 1).length;
+  // Most replicated paper by this author — the work others have actually built on
+  const mostReplicated = papers
+    .map((s) => ({ s, ic: getIntentCounts(s.paper.id) }))
+    .filter((r) => r.ic.replication > 0)
+    .sort((a, b) => b.ic.replication - a.ic.replication)[0];
 
   return (
     <>
@@ -86,6 +101,45 @@ export default async function AuthorPage({ params }: Params) {
             hint={topVenues[0] ? `${topVenues[0][1]} papers` : undefined}
           />
         </dl>
+        {totalInCorpusCitedBy > 0 && (
+          <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat
+              label="In-corpus cited-by"
+              value={totalInCorpusCitedBy.toLocaleString()}
+              hint={`across ${papersWithReplication} replication-leading paper${papersWithReplication === 1 ? "" : "s"}`}
+            />
+            <Stat
+              label="Replication-strength"
+              value={totalReplication.toLocaleString()}
+              hint="methodology + result + extension intent"
+            />
+            <Stat
+              label="Background mentions"
+              value={totalBackground.toLocaleString()}
+              hint="lit-review citations"
+            />
+            {mostReplicated && (
+              <Stat
+                label="Most replicated"
+                value={mostReplicated.ic.replication}
+                hint={mostReplicated.s.paper.title.slice(0, 36) + "…"}
+              />
+            )}
+          </dl>
+        )}
+        {mostReplicated && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Most-replicated work:{" "}
+            <Link
+              href={`/paper/${encodeURIComponent(mostReplicated.s.paper.id)}`}
+              className="underline"
+            >
+              {mostReplicated.s.paper.title}
+            </Link>{" "}
+            — {mostReplicated.ic.replication} other corpus paper
+            {mostReplicated.ic.replication === 1 ? "" : "s"} built on it.
+          </p>
+        )}
       </section>
 
       <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">

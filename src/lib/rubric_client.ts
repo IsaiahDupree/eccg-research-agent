@@ -40,6 +40,8 @@ const SYNC_EVENT = "eccg-rubric-sync";
 let cache: RubricWeightOverrides | null = null;
 let inflight: Promise<RubricWeightOverrides> | null = null;
 
+let editorsState: { enforced: boolean; editors: string[] } | null = null;
+
 async function ensureLoaded(): Promise<RubricWeightOverrides> {
   if (cache) return cache;
   if (inflight) return inflight;
@@ -48,14 +50,23 @@ async function ensureLoaded(): Promise<RubricWeightOverrides> {
       const r = await fetch("/api/rubric", { cache: "no-store" });
       const j = await r.json();
       cache = { ...DEFAULT_WEIGHTS, ...(j.weights ?? {}) };
+      editorsState = {
+        enforced: Boolean(j.editors_enforced),
+        editors: Array.isArray(j.editors) ? j.editors : [],
+      };
     } catch {
       cache = { ...DEFAULT_WEIGHTS };
+      editorsState = { enforced: false, editors: [] };
     }
     return cache!;
   })().finally(() => {
     inflight = null;
   });
   return inflight;
+}
+
+export function getEditorsState(): { enforced: boolean; editors: string[] } {
+  return editorsState ?? { enforced: false, editors: [] };
 }
 
 function notify() {
@@ -91,18 +102,23 @@ export function useRubricWeights(): {
   return { weights, loaded };
 }
 
-export async function saveRubricWeights(next: RubricWeightOverrides): Promise<boolean> {
+export async function saveRubricWeights(
+  next: RubricWeightOverrides,
+  user: string,
+): Promise<{ ok: boolean; error?: string }> {
   cache = { ...next };
   notify();
   try {
     const r = await fetch("/api/rubric", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ weights: next }),
+      body: JSON.stringify({ weights: next, user }),
     });
-    return r.ok;
-  } catch {
-    return false;
+    if (r.ok) return { ok: true };
+    const j = await r.json().catch(() => ({}));
+    return { ok: false, error: j.error ?? `HTTP ${r.status}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
 

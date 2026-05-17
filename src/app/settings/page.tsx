@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, RotateCcw, Save, Sliders } from "lucide-react";
+import { Loader2, Lock, RotateCcw, Save, Sliders } from "lucide-react";
 import {
   DEFAULT_WEIGHTS,
+  getEditorsState,
   type RubricWeightOverrides,
   saveRubricWeights,
   useRubricWeights,
@@ -29,10 +30,18 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<RubricWeightOverrides>(loaded);
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [me, setMe] = useState<string>("anonymous");
+  const [editors, setEditors] = useState<{ enforced: boolean; editors: string[] }>({
+    enforced: false,
+    editors: [],
+  });
 
   useEffect(() => {
     setDraft({ ...loaded });
-  }, [loaded]);
+    setMe(getIdentity().alias);
+    setEditors(getEditorsState());
+  }, [loaded, ready]);
 
   const total = Object.values(draft).reduce((s, v) => s + v, 0);
   const desc = Object.fromEntries(
@@ -40,15 +49,19 @@ export default function SettingsPage() {
   ) as Record<keyof RubricWeightOverrides, string>;
   const dirty = ORDER.some((k) => draft[k] !== loaded[k]);
 
+  const isReadOnly =
+    editors.enforced && !editors.editors.some((e) => e.toLowerCase() === me.toLowerCase());
+
   async function commit() {
     setBusy(true);
-    const ok = await saveRubricWeights({
-      ...draft,
-    });
+    setError(null);
+    const result = await saveRubricWeights({ ...draft }, me);
     setBusy(false);
-    if (ok) {
+    if (result.ok) {
       setSavedAt(new Date().toLocaleTimeString());
-      window.dispatchEvent(new Event("storage")); // poke other tabs
+      window.dispatchEvent(new Event("storage"));
+    } else {
+      setError(result.error ?? "save failed");
     }
   }
 
@@ -76,6 +89,21 @@ export default function SettingsPage() {
         </p>
       </section>
 
+      {ready && isReadOnly && (
+        <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span>
+            Read-only — only editors{" "}
+            <strong>{editors.editors.join(", ")}</strong> can save. Set your
+            alias to one of these in the header, or update the{" "}
+            <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">
+              EDITORS
+            </code>{" "}
+            env var to extend access.
+          </span>
+        </div>
+      )}
+
       {!ready ? (
         <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading current weights from Drive…
@@ -101,6 +129,9 @@ export default function SettingsPage() {
             saved at {savedAt}
           </span>
         )}
+        {error && (
+          <span className="text-xs text-rose-700 dark:text-rose-400">{error}</span>
+        )}
         <button
           type="button"
           onClick={reset}
@@ -113,7 +144,7 @@ export default function SettingsPage() {
         <button
           type="button"
           onClick={commit}
-          disabled={!dirty || busy}
+          disabled={!dirty || busy || isReadOnly}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-md border bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent/90",
             (!dirty || busy) && "opacity-50",
