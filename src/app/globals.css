@@ -46,3 +46,39 @@ body {
 * {
   border-color: var(--border);
 }
+
+/* Tighten heading rhythm — Tailwind v4 doesn't enforce one by default. */
+h1, h2, h3, h4 {
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+/* Make keyboard focus visible app-wide. Mouse / touch users keep the
+   chrome's default outline-less feel; keyboard users get a clear ring. */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--accent);
+  border-radius: 6px;
+}
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--accent);
+}
+
+/* Honour reduced motion preferences across animated UI. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Smooth anchor scroll for in-page links + the "Skip to content" landmark. */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}

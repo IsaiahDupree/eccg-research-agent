@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Trophy, Flame, AlertTriangle, GitBranch } from "lucide-react";
 import { Badge } from "@/components/Badge";
+import { EmptyState } from "@/components/EmptyState";
+import { PaperListSkeleton } from "@/components/Skeleton";
 import { VoteWidget } from "@/components/VoteWidget";
 import { loadSeedPipelineClient } from "@/lib/seed_client";
 import { useVotes, hotness } from "@/lib/votes_client";
@@ -344,24 +346,22 @@ export default function LeaderboardPage() {
         />
       )}
 
-      <ol className="rounded-lg border" suppressHydrationWarning>
+      <div suppressHydrationWarning>
         {!loaded ? (
-          <li className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Loading votes…
-          </li>
+          <PaperListSkeleton rows={5} />
         ) : ranked.length === 0 ? (
-          <li className="flex flex-col items-center px-4 py-12 text-center">
-            <Trophy className="h-8 w-8 text-muted-foreground" aria-hidden />
-            <p className="mt-3 text-sm">No votes yet. Be the first.</p>
-            <Link
-              href="/"
-              className="mt-4 text-sm text-accent underline-offset-4 hover:underline"
-            >
-              Browse papers →
-            </Link>
-          </li>
+          <EmptyState
+            icon={Trophy}
+            title="No leaderboard data yet"
+            description={
+              mode === "influence"
+                ? "Influence ranks papers by replication-strength citations plus community votes. Once the corpus has both, this view fills in."
+                : "Community votes will appear here once team members start ranking papers."
+            }
+            cta={{ href: "/", label: "Browse papers →" }}
+          />
         ) : (
-          ranked.map((row, i) => {
+          <ol className="rounded-lg border">{ranked.map((row, i) => {
             const p = row.scored.paper;
             return (
               <li
@@ -426,9 +426,9 @@ export default function LeaderboardPage() {
                 </div>
               </li>
             );
-          })
+          })}</ol>
         )}
-      </ol>
+      </div>
     </>
   );
 }

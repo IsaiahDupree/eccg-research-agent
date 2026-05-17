@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Flame, Sparkles, Trophy } from "lucide-react";
+import { Flame, FileQuestion, Sparkles, Trophy } from "lucide-react";
 import { FilterBar } from "./FilterBar";
+import { EmptyState } from "./EmptyState";
 import { PaperRow } from "./PaperRow";
 import { hotness, netToRubricRaw, useVotes } from "@/lib/votes_client";
 import { asScored, useCustomCorpus } from "@/lib/custom_corpus_client";
@@ -208,13 +209,31 @@ export function PaperList({ scored }: PaperListProps) {
         </span>
       </div>
 
-      <div className="rounded-lg border">
+      <div>
         {sortedAndFiltered.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            No papers match the current filter.
-          </div>
+          <EmptyState
+            icon={FileQuestion}
+            title="No papers match the current filter"
+            description={
+              query || active.length > 0
+                ? "Try clearing the search or category filters."
+                : `No papers tagged for the ${niche.label} niche yet. The daily cron checks for new arXiv submissions every morning.`
+            }
+            cta={
+              query || active.length > 0
+                ? {
+                    onClick: () => {
+                      setQuery("");
+                      setActive([]);
+                      setPage(0);
+                    },
+                    label: "Clear filters",
+                  }
+                : undefined
+            }
+          />
         ) : (
-          pageItems.map((d, i) => (
+          <div className="rounded-lg border">{pageItems.map((d, i) => (
             <PaperRow
               key={d.scored.paper.id}
               scored={d.scored}
@@ -231,7 +250,7 @@ export function PaperList({ scored }: PaperListProps) {
                       : undefined
               }
             />
-          ))
+          ))}</div>
         )}
       </div>
 

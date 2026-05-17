@@ -16,7 +16,12 @@ function ic(over: Partial<IntentCounts>): IntentCounts {
   return { ...ZERO_IC, ...over };
 }
 
-function paper(over: Partial<Paper> & { id: string; authors: string[] }): Paper {
+type PaperOverrides = Omit<Partial<Paper>, "authors"> & {
+  id: string;
+  authors: string[];
+};
+
+function paper(over: PaperOverrides): Paper {
   const has = (k: keyof Paper) => Object.prototype.hasOwnProperty.call(over, k);
   return {
     id: over.id,

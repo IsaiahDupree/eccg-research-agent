@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { Badge } from "@/components/Badge";
+import { EmptyState } from "@/components/EmptyState";
+import { InlineLoader } from "@/components/Skeleton";
 import { getIdentity } from "@/lib/identity";
 import { NICHES } from "@/lib/niches";
 import { categoryLabel, cn } from "@/lib/utils";
@@ -315,15 +317,26 @@ export default function ReviewPage() {
       )}
 
       {!data ? (
-        <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading review queue from Drive…
-        </div>
+        <InlineLoader>Loading review queue from Drive…</InlineLoader>
       ) : filteredRecords.length === 0 ? (
-        <div className="rounded-lg border bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground">
-          {nicheFilter === "all"
-            ? "Queue is empty. New cron-picked papers will land here daily."
-            : `No pending papers in ${nicheFilter}. Clear the niche filter to see the full queue.`}
-        </div>
+        <EmptyState
+          icon={ShieldCheck}
+          title={
+            nicheFilter === "all"
+              ? "Queue is empty"
+              : `No pending papers in ${nicheFilter}`
+          }
+          description={
+            nicheFilter === "all"
+              ? "New cron-picked papers will land here daily at 06:00 UTC. Approved papers move into the main rankings; rejected ones stay hidden in Drive state so they don't get re-ingested."
+              : "Clear the niche filter to see the full queue, or check back tomorrow."
+          }
+          cta={
+            nicheFilter !== "all"
+              ? { onClick: () => setNicheFilterAndUrl("all"), label: "Show all niches" }
+              : undefined
+          }
+        />
       ) : (
         <>
           {/* Per-category quick actions */}

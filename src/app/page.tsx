@@ -34,16 +34,16 @@ export default function HomePage() {
   return (
     <>
       <section className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
           Event-camera research, ranked.
         </h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+        <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
           A continuously-updated digest of the latest event-based-vision papers.
           Pulled from arXiv, hydrated with Semantic Scholar citation data,
           scored by a transparent rubric, and summarized for the ECCG community.
         </p>
-        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Papers tracked" value={result.scored.length} />
+        <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label="Papers tracked" value={result.scored.length.toLocaleString()} />
           <Stat
             label="Avg score"
             value={(
@@ -80,11 +80,11 @@ export default function HomePage() {
 
 function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="rounded-lg border bg-card p-3">
-      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+    <div className="rounded-lg border bg-card p-3 transition-colors hover:bg-muted/30">
+      <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 text-xl font-semibold tabular-nums">{value}</dd>
+      <dd className="mt-1 text-2xl font-semibold tabular-nums">{value}</dd>
       {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );

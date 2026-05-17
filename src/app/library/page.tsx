@@ -7,6 +7,8 @@ import { loadSeedPipelineClient } from "@/lib/seed_client";
 import { useLibrary, clearLibraryCache } from "@/lib/library_client";
 import { useVotes } from "@/lib/votes_client";
 import { PaperRow } from "@/components/PaperRow";
+import { EmptyState } from "@/components/EmptyState";
+import { PaperListSkeleton } from "@/components/Skeleton";
 import { toBibtex } from "@/lib/bibtex";
 import { categoryLabel, formatMonthsAgo } from "@/lib/utils";
 import type { ScoredPaper } from "@/lib/models";
@@ -157,38 +159,37 @@ export default function LibraryPage() {
           </p>
         )}
       </section>
-      <div className="rounded-lg border" suppressHydrationWarning>
+      <div suppressHydrationWarning>
         {!loaded ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Loading from shared Drive…
-          </div>
+          <PaperListSkeleton rows={4} />
         ) : visible.length === 0 ? (
-          <div className="flex flex-col items-center px-4 py-12 text-center">
-            <Bookmark className="h-8 w-8 text-muted-foreground" aria-hidden />
-            <p className="mt-3 text-sm">
-              Team library is empty. Tap{" "}
-              <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs">
-                <Bookmark className="h-3 w-3" /> Save
-              </span>{" "}
-              on any paper to add it.
-            </p>
-            <Link
-              href="/"
-              className="mt-4 text-sm text-accent underline-offset-4 hover:underline"
-            >
-              Browse papers →
-            </Link>
-          </div>
+          <EmptyState
+            icon={Bookmark}
+            title="Your team library is empty"
+            description={
+              <>
+                Tap{" "}
+                <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px]">
+                  <Bookmark className="h-3 w-3" /> Save
+                </span>{" "}
+                on any paper to add it here. Library entries persist to the
+                shared Drive folder so the whole team sees the same set.
+              </>
+            }
+            cta={{ href: "/", label: "Browse papers →" }}
+          />
         ) : (
-          visible.map((row, i) => (
-            <div key={row.saved.paper_id}>
-              <PaperRow scored={row.paper} rank={i + 1} />
-              <div className="-mt-2 ml-12 mb-3 text-[11px] text-muted-foreground">
-                Saved by <strong>{row.saved.added_by}</strong> ·{" "}
-                {new Date(row.saved.added_at).toLocaleString()}
+          <div className="rounded-lg border">
+            {visible.map((row, i) => (
+              <div key={row.saved.paper_id}>
+                <PaperRow scored={row.paper} rank={i + 1} />
+                <div className="-mt-2 ml-12 mb-3 text-[11px] text-muted-foreground">
+                  Saved by <strong>{row.saved.added_by}</strong> ·{" "}
+                  {new Date(row.saved.added_at).toLocaleString()}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </>
