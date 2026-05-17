@@ -52,16 +52,21 @@ export default async function PaperPage({ params }: Params) {
     related = [...related, ...extras].slice(0, 4);
   }
 
-  // In-corpus citation graph
+  // In-corpus citation graph (edges now carry intent metadata)
   const edges = getCitationEdges(scored.paper.id);
   const cites = edges.cites
-    .map((id) => byId.get(id))
-    .filter((s): s is NonNullable<typeof s> => Boolean(s))
-    .sort((a, b) => b.total - a.total);
+    .map((e) => ({ s: byId.get(e.id), intents: e.intents }))
+    .filter((row): row is { s: NonNullable<typeof row.s>; intents: typeof row.intents } => Boolean(row.s))
+    .sort((a, b) => b.s.total - a.s.total);
   const citedBy = edges.cited_by
-    .map((id) => byId.get(id))
-    .filter((s): s is NonNullable<typeof s> => Boolean(s))
-    .sort((a, b) => b.total - a.total);
+    .map((e) => ({ s: byId.get(e.id), intents: e.intents }))
+    .filter((row): row is { s: NonNullable<typeof row.s>; intents: typeof row.intents } => Boolean(row.s))
+    .sort((a, b) => {
+      const ra = a.intents.some((i) => i === "methodology" || i === "result" || i === "extensionMethodology") ? 1 : 0;
+      const rb = b.intents.some((i) => i === "methodology" || i === "result" || i === "extensionMethodology") ? 1 : 0;
+      if (ra !== rb) return rb - ra;
+      return b.s.total - a.s.total;
+    });
 
   return (
     <article className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
@@ -196,15 +201,28 @@ export default async function PaperPage({ params }: Params) {
                 </p>
                 <ul className="mt-2 space-y-2 text-sm">
                   {cites.slice(0, 8).map((c) => (
-                    <li key={c.paper.id}>
+                    <li key={c.s.paper.id}>
                       <Link
-                        href={`/paper/${encodeURIComponent(c.paper.id)}`}
+                        href={`/paper/${encodeURIComponent(c.s.paper.id)}`}
                         className="line-clamp-2 hover:underline"
                       >
-                        {c.paper.title}
+                        {c.s.paper.title}
                       </Link>
-                      <div className="text-xs text-muted-foreground">
-                        score {c.total.toFixed(0)} · {c.paper.citation_count} citations
+                      <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                        <span>score {c.s.total.toFixed(0)} · {c.s.paper.citation_count} citations</span>
+                        {c.intents.map((i) => (
+                          <Badge
+                            key={i}
+                            variant={
+                              i === "methodology" || i === "result" || i === "extensionMethodology"
+                                ? "success"
+                                : "muted"
+                            }
+                            className="ml-1"
+                          >
+                            {i}
+                          </Badge>
+                        ))}
                       </div>
                     </li>
                   ))}
@@ -223,21 +241,33 @@ export default async function PaperPage({ params }: Params) {
                   <span className="text-muted-foreground">({citedBy.length})</span>
                 </h3>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Other corpus papers that reference this one — a proxy for
-                  community influence and replication.
+                  Other corpus papers that reference this one. Green = built on this work
+                  (methodology / result / extension). Gray = named in background.
                 </p>
                 <ul className="mt-2 space-y-2 text-sm">
                   {citedBy.slice(0, 8).map((c) => (
-                    <li key={c.paper.id}>
+                    <li key={c.s.paper.id}>
                       <Link
-                        href={`/paper/${encodeURIComponent(c.paper.id)}`}
+                        href={`/paper/${encodeURIComponent(c.s.paper.id)}`}
                         className="line-clamp-2 hover:underline"
                       >
-                        {c.paper.title}
+                        {c.s.paper.title}
                       </Link>
-                      <div className="text-xs text-muted-foreground">
-                        score {c.total.toFixed(0)} ·{" "}
-                        {formatMonthsAgo(c.paper.months_since_publish)}
+                      <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                        <span>score {c.s.total.toFixed(0)} · {formatMonthsAgo(c.s.paper.months_since_publish)}</span>
+                        {c.intents.map((i) => (
+                          <Badge
+                            key={i}
+                            variant={
+                              i === "methodology" || i === "result" || i === "extensionMethodology"
+                                ? "success"
+                                : "muted"
+                            }
+                            className="ml-1"
+                          >
+                            {i}
+                          </Badge>
+                        ))}
                       </div>
                     </li>
                   ))}

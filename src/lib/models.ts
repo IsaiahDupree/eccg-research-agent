@@ -48,6 +48,9 @@ export interface Paper {
   influential_citation_count?: number;
   months_since_publish: number;
   citations_per_month: number;
+  // in-corpus citation graph (count of other corpus papers referencing this one)
+  in_corpus_cited_by?: number;
+  in_corpus_replication?: number; // subset cited as methodology / result
   // taxonomy assignment (UZH-RPG sub-area)
   eccg_category?: string;
   eccg_relevance?: number; // 0-1

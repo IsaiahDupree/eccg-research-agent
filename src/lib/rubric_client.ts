@@ -20,17 +20,19 @@ export interface RubricWeightOverrides {
   author_signal: number;
   recency: number;
   community_score: number;
+  citation_graph: number;
 }
 
 export const DEFAULT_WEIGHTS: RubricWeightOverrides = {
-  citation_velocity: 18,
+  citation_velocity: 13,
   eccg_relevance: 22,
   code_availability: 12,
   novelty: 12,
   venue_prestige: 8,
-  author_signal: 8,
+  author_signal: 6,
   recency: 5,
-  community_score: 15,
+  community_score: 12,
+  citation_graph: 10,
 };
 
 const SYNC_EVENT = "eccg-rubric-sync";

@@ -1,7 +1,7 @@
 /**
  * Scoring rubric. Pure data — change a weight, change the ranking.
  *
- * Total weights sum to 100 so the composite is naturally on a 0–100 scale.
+ * Weights sum to 100 so the composite is naturally on a 0–100 scale.
  * Each category's contribution is `raw (0-10) * weight / 10`, so max
  * contribution equals the weight value.
  */
@@ -20,7 +20,7 @@ export const DEFAULT_RUBRIC: Rubric = {
   categories: [
     {
       name: "citation_velocity",
-      weight: 18,
+      weight: 13,
       description: "Citations per month since publish, normalised by venue baseline.",
     },
     {
@@ -45,7 +45,7 @@ export const DEFAULT_RUBRIC: Rubric = {
     },
     {
       name: "author_signal",
-      weight: 8,
+      weight: 6,
       description: "Max author h-index, normalised.",
     },
     {
@@ -55,9 +55,15 @@ export const DEFAULT_RUBRIC: Rubric = {
     },
     {
       name: "community_score",
-      weight: 15,
+      weight: 12,
       description:
         "ECCG team votes (Reddit-style ±1). Live overlay computed client-side from the Drive-backed votes state; here it's a placeholder filled in at render time on /paper/[id].",
+    },
+    {
+      name: "citation_graph",
+      weight: 10,
+      description:
+        "In-corpus citation count, weighted toward replication-strength citations (papers that built on this work — methodology/result intent — not just named it as background).",
     },
   ],
 };
@@ -67,7 +73,7 @@ const TIER1 = /\b(CVPR|ICCV|ECCV|NeurIPS|NIPS|ICML|ICLR|TPAMI|IJCV|TRO|RAL|ICRA|
 const TIER2 = /\b(BMVC|WACV|3DV|AAAI|IJCAI|TIP|TCSVT|ACCV|TVCG)\b/i;
 
 export function venuePrestige(venueName?: string): number {
-  if (!venueName) return 3; // arXiv-only
+  if (!venueName) return 3;
   if (TIER1.test(venueName)) return 9;
   if (TIER2.test(venueName)) return 7;
   return 4;

@@ -60,6 +60,9 @@ export class Scorer {
             rationale: "neutral until votes are cast",
           });
           break;
+        case "citation_graph":
+          cats.push(this.scoreCitationGraph(cat.weight, paper));
+          break;
       }
     }
 
@@ -149,6 +152,25 @@ export class Scorer {
       weight,
       raw,
       rationale: `${p.months_since_publish.toFixed(1)} months old`,
+    };
+  }
+
+  private scoreCitationGraph(weight: number, p: Paper): CategoryScore {
+    const total = p.in_corpus_cited_by ?? 0;
+    const repl = p.in_corpus_replication ?? 0;
+    // log2 scale gives a generous gradient at the low end without rewarding
+    // the long tail past ~1k corpus references. Replication-strength
+    // citations (methodology / result) count double.
+    const weighted = total + repl;
+    const raw = Math.min(10, Math.log2(weighted + 1));
+    return {
+      name: "citation_graph",
+      weight,
+      raw,
+      rationale:
+        total === 0
+          ? "no in-corpus citations yet"
+          : `cited by ${total} corpus paper${total === 1 ? "" : "s"}${repl > 0 ? `, ${repl} as methodology/result` : ""}`,
     };
   }
 }

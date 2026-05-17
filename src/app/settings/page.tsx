@@ -15,6 +15,7 @@ import { DEFAULT_RUBRIC } from "@/lib/scoring/weights";
 const ORDER: (keyof RubricWeightOverrides)[] = [
   "eccg_relevance",
   "citation_velocity",
+  "citation_graph",
   "community_score",
   "code_availability",
   "novelty",

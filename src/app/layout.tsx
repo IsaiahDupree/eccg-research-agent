@@ -96,6 +96,12 @@ export default function RootLayout({
                 Leaderboard
               </Link>
               <Link
+                href="/influential"
+                className="rounded-md px-2.5 py-1.5 hover:bg-muted"
+              >
+                Influential
+              </Link>
+              <Link
                 href="/compare"
                 className="rounded-md px-2.5 py-1.5 hover:bg-muted"
               >
