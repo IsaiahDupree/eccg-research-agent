@@ -5,6 +5,7 @@ import {
   saveVotes,
   type CollabVotesPerPaper,
 } from "@/lib/collab";
+import { rateLimit, rateLimitHeaders } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,14 @@ export async function POST(req: Request, { params }: Ctx) {
   const voter = (body.voter ?? "anonymous").trim().slice(0, 40) || "anonymous";
   const reason = (body.reason ?? "").trim().slice(0, 200) || undefined;
 
+  const limit = await rateLimit({ alias: voter });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "rate_limit_exceeded", retry_after_ms: limit.retry_after_ms },
+      { status: 429, headers: rateLimitHeaders(limit) },
+    );
+  }
+
   const { votes } = await loadCollab();
   const current = votes[decoded] ?? { ...EMPTY, voters: [] };
   // Remove any existing vote by this voter
@@ -46,5 +55,8 @@ export async function POST(req: Request, { params }: Ctx) {
   const finalized = recomputeVoteCounts(next);
   const updated = { ...votes, [decoded]: finalized };
   await saveVotes(updated);
-  return NextResponse.json({ ok: true, votes: finalized });
+  return NextResponse.json(
+    { ok: true, votes: finalized },
+    { headers: rateLimitHeaders(limit) },
+  );
 }

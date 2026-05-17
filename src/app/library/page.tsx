@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Bookmark, Download, FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
 import { loadSeedPipelineClient } from "@/lib/seed_client";
-import { useLibrary, clearLibraryCache } from "@/lib/library_client";
+import { useLibrary, clearLibraryCache, type ReadingStatus } from "@/lib/library_client";
 import { useVotes } from "@/lib/votes_client";
 import { PaperRow } from "@/components/PaperRow";
 import { EmptyState } from "@/components/EmptyState";
+import { LibraryEntryControls, ReadingStatusFilter } from "@/components/LibraryEntryControls";
 import { PaperListSkeleton } from "@/components/Skeleton";
 import { toBibtex } from "@/lib/bibtex";
 import { categoryLabel, formatMonthsAgo } from "@/lib/utils";
@@ -24,10 +25,71 @@ export default function LibraryPage() {
 
   const byId = new Map(scored.map((s) => [s.paper.id, s]));
   const sortedItems = [...items].sort((a, b) => b.added_at.localeCompare(a.added_at));
-  const visible = sortedItems
+  const allVisible = sortedItems
     .map((i) => ({ saved: i, paper: byId.get(i.paper_id) }))
     .filter((row): row is { saved: typeof items[number]; paper: ScoredPaper } => Boolean(row.paper));
-  const missing = sortedItems.length - visible.length;
+  const missing = sortedItems.length - allVisible.length;
+
+  // Status filter — initialise from ?status= URL param so links are shareable.
+  const [statusFilter, setStatusFilter] = useState<ReadingStatus | "all">("all");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URL(window.location.href).searchParams;
+    const s = params.get("status");
+    if (s === "to_read" || s === "reading" || s === "read") setStatusFilter(s);
+    const t = params.get("tag");
+    if (t) setTagFilter(t);
+  }, []);
+
+  const statusCounts = useMemo(() => {
+    const counts = { all: allVisible.length, to_read: 0, reading: 0, read: 0 };
+    for (const r of allVisible) {
+      const s = r.saved.reading_status;
+      if (s === "to_read") counts.to_read++;
+      else if (s === "reading") counts.reading++;
+      else if (s === "read") counts.read++;
+    }
+    return counts;
+  }, [allVisible]);
+
+  const allTags = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of allVisible) {
+      for (const t of r.saved.tags ?? []) {
+        counts.set(t, (counts.get(t) ?? 0) + 1);
+      }
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [allVisible]);
+
+  const visible = useMemo(() => {
+    return allVisible.filter((r) => {
+      if (statusFilter !== "all" && r.saved.reading_status !== statusFilter) return false;
+      if (tagFilter && !(r.saved.tags ?? []).includes(tagFilter)) return false;
+      return true;
+    });
+  }, [allVisible, statusFilter, tagFilter]);
+
+  function updateStatusFilter(next: ReadingStatus | "all") {
+    setStatusFilter(next);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (next === "all") url.searchParams.delete("status");
+      else url.searchParams.set("status", next);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }
+
+  function updateTagFilter(next: string | null) {
+    setTagFilter(next);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (!next) url.searchParams.delete("tag");
+      else url.searchParams.set("tag", next);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }
 
   function exportBibtex() {
     const papers = visible.map(({ paper: s }) => s.paper);
@@ -174,31 +236,88 @@ export default function LibraryPage() {
           </p>
         )}
       </section>
+      {loaded && allVisible.length > 0 && (
+        <div className="mb-3 space-y-2">
+          <ReadingStatusFilter
+            value={statusFilter}
+            onChange={updateStatusFilter}
+            counts={statusCounts}
+          />
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 text-xs">
+              <span className="mr-1 text-muted-foreground">Tags:</span>
+              <button
+                type="button"
+                onClick={() => updateTagFilter(null)}
+                aria-pressed={!tagFilter}
+                className={`rounded-full border px-2.5 py-0.5 ${!tagFilter ? "border-accent bg-accent text-accent-foreground" : "hover:bg-muted"}`}
+              >
+                Any
+              </button>
+              {allTags.map(([t, count]) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => updateTagFilter(t === tagFilter ? null : t)}
+                  aria-pressed={tagFilter === t}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 ${
+                    tagFilter === t ? "border-accent bg-accent text-accent-foreground" : "hover:bg-muted"
+                  }`}
+                >
+                  {t}
+                  <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">
+                    {count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div suppressHydrationWarning>
         {!loaded ? (
           <PaperListSkeleton rows={4} />
         ) : visible.length === 0 ? (
           <EmptyState
             icon={Bookmark}
-            title="Your team library is empty"
-            description={
-              <>
-                Tap{" "}
-                <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px]">
-                  <Bookmark className="h-3 w-3" /> Save
-                </span>{" "}
-                on any paper to add it here. Library entries persist to the
-                shared Drive folder so the whole team sees the same set.
-              </>
+            title={
+              statusFilter !== "all" || tagFilter
+                ? `No library entries match the filter`
+                : "Your team library is empty"
             }
-            cta={{ href: "/", label: "Browse papers →" }}
+            description={
+              statusFilter !== "all" || tagFilter ? (
+                "Clear filters to see your full library."
+              ) : (
+                <>
+                  Tap{" "}
+                  <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px]">
+                    <Bookmark className="h-3 w-3" /> Save
+                  </span>{" "}
+                  on any paper to add it here. Library entries persist to the
+                  shared Drive folder so the whole team sees the same set.
+                </>
+              )
+            }
+            cta={
+              statusFilter !== "all" || tagFilter
+                ? {
+                    onClick: () => {
+                      updateStatusFilter("all");
+                      updateTagFilter(null);
+                    },
+                    label: "Clear filters",
+                  }
+                : { href: "/", label: "Browse papers →" }
+            }
           />
         ) : (
           <div className="rounded-lg border">
             {visible.map((row, i) => (
               <div key={row.saved.paper_id}>
                 <PaperRow scored={row.paper} rank={i + 1} />
-                <div className="-mt-2 ml-12 mb-3 text-[11px] text-muted-foreground">
+                <LibraryEntryControls item={row.saved} />
+                <div className="ml-12 mb-3 text-[11px] text-muted-foreground">
                   Saved by <strong>{row.saved.added_by}</strong> ·{" "}
                   {new Date(row.saved.added_at).toLocaleString()}
                 </div>

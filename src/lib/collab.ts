@@ -3,11 +3,15 @@
  * Persisted to the Drive folder via `lib/google/state.ts`.
  */
 
+export type ReadingStatus = "to_read" | "reading" | "read";
+
 export interface CollabLibraryItem {
   paper_id: string;
   added_by: string;       // user alias (free-text)
   added_at: string;       // ISO
   tags?: string[];
+  reading_status?: ReadingStatus;
+  status_updated_at?: string; // ISO of the last reading-status change
 }
 
 export interface CollabNote {

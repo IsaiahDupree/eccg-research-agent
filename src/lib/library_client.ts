@@ -11,10 +11,15 @@
 import { useEffect, useState } from "react";
 import { getIdentity } from "./identity";
 
-interface LibraryItem {
+export type ReadingStatus = "to_read" | "reading" | "read";
+
+export interface LibraryItem {
   paper_id: string;
   added_by: string;
   added_at: string;
+  tags?: string[];
+  reading_status?: ReadingStatus;
+  status_updated_at?: string;
 }
 
 let cache: LibraryItem[] | null = null;
@@ -99,4 +104,53 @@ export async function toggleLibrary(paperId: string): Promise<boolean> {
 export function clearLibraryCache() {
   cache = null;
   notify();
+}
+
+/**
+ * Update tags and/or reading_status for an already-saved paper. Returns
+ * the new state of the library, or null when the paper isn't in the
+ * library yet. Optimistic — applies locally first, then reconciles with
+ * the server response.
+ */
+export async function updateLibraryEntry(
+  paperId: string,
+  patch: { tags?: string[]; reading_status?: ReadingStatus },
+): Promise<LibraryItem | null> {
+  const current = cache ?? (await ensureLoaded());
+  const idx = current.findIndex((i) => i.paper_id === paperId);
+  if (idx < 0) return null;
+  const optimistic: LibraryItem = {
+    ...current[idx],
+    ...(patch.tags !== undefined ? { tags: patch.tags } : {}),
+    ...(patch.reading_status !== undefined
+      ? {
+          reading_status: patch.reading_status,
+          status_updated_at: new Date().toISOString(),
+        }
+      : {}),
+  };
+  cache = [...current];
+  cache[idx] = optimistic;
+  notify();
+  try {
+    const res = await fetch("/api/library", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "update",
+        paper_id: paperId,
+        user: getIdentity().alias,
+        ...patch,
+      }),
+    });
+    const json = await res.json();
+    if (json.ok && Array.isArray(json.library)) {
+      cache = json.library;
+      notify();
+      return json.library.find((i: LibraryItem) => i.paper_id === paperId) ?? null;
+    }
+  } catch {
+    /* keep optimistic */
+  }
+  return optimistic;
 }

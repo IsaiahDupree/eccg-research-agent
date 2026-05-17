@@ -20,6 +20,7 @@ import {
   listEditorEmails,
   readApiTokenAttribution,
 } from "@/lib/editors";
+import { rateLimit, rateLimitHeaders } from "@/lib/ratelimit";
 import { appendAudit } from "@/lib/review_audit";
 
 export const runtime = "nodejs";
@@ -53,6 +54,17 @@ export async function POST(req: Request) {
         editor_emails: listEditorEmails(),
       },
       { status: 403 },
+    );
+  }
+  const limit = await rateLimit({
+    apiTokenAttribution: tokenAttribution,
+    email: session?.email,
+    alias: user,
+  });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "rate_limit_exceeded", retry_after_ms: limit.retry_after_ms },
+      { status: 429, headers: rateLimitHeaders(limit) },
     );
   }
   const records = await loadCustomCorpus();

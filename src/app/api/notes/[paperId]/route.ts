@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadCollab, saveNotes, type CollabNote } from "@/lib/collab";
+import { rateLimit, rateLimitHeaders } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,13 @@ export async function POST(req: Request, { params }: Ctx) {
   if (!text) {
     return NextResponse.json({ ok: false, error: "empty note" }, { status: 400 });
   }
+  const limit = await rateLimit({ alias: author });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "rate_limit_exceeded", retry_after_ms: limit.retry_after_ms },
+      { status: 429, headers: rateLimitHeaders(limit) },
+    );
+  }
   const { notes } = await loadCollab();
   const next: CollabNote = {
     id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -37,7 +45,10 @@ export async function POST(req: Request, { params }: Ctx) {
   const list = notes[decoded] ?? [];
   const updated = { ...notes, [decoded]: [...list, next] };
   await saveNotes(updated);
-  return NextResponse.json({ ok: true, note: next, count: updated[decoded].length });
+  return NextResponse.json(
+    { ok: true, note: next, count: updated[decoded].length },
+    { headers: rateLimitHeaders(limit) },
+  );
 }
 
 export async function DELETE(req: Request, { params }: Ctx) {

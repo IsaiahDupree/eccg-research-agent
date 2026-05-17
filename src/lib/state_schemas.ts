@@ -106,6 +106,8 @@ export const LibraryStateSchema = z.array(
     added_by: z.string(),
     added_at: IsoDate,
     tags: z.array(z.string()).optional(),
+    reading_status: z.enum(["to_read", "reading", "read"]).optional(),
+    status_updated_at: IsoDate.optional(),
   }),
 );
 
