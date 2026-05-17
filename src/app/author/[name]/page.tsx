@@ -5,15 +5,12 @@ import { loadSeedPipeline } from "@/lib/seed";
 import { PaperRow } from "@/components/PaperRow";
 import { Badge } from "@/components/Badge";
 import { getIntentCounts } from "@/lib/citations";
+import { computeAuthorStats, normaliseAuthor as normaliseName } from "@/lib/author_stats";
 
 export const dynamicParams = true;
 
 interface Params {
   params: Promise<{ name: string }>;
-}
-
-function normaliseName(s: string): string {
-  return s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").trim();
 }
 
 export async function generateStaticParams() {
@@ -49,54 +46,23 @@ export default async function AuthorPage({ params }: Params) {
   const display =
     papers[0]?.paper.authors.find((a) => normaliseName(a.name) === target)?.name ?? decoded;
 
-  const venues = new Map<string, number>();
-  const categories = new Map<string, number>();
-  let totalCitations = 0;
-  let totalInCorpusCitedBy = 0;
-  let totalReplication = 0;
-  let totalBackground = 0;
-  let papersWithReplication = 0;
-  for (const s of papers) {
-    const v = s.paper.venue?.name ?? "preprint";
-    venues.set(v, (venues.get(v) ?? 0) + 1);
-    const c = s.paper.eccg_category ?? "unclassified";
-    categories.set(c, (categories.get(c) ?? 0) + 1);
-    totalCitations += s.paper.citation_count;
-    const ic = getIntentCounts(s.paper.id);
-    totalInCorpusCitedBy += ic.total;
-    totalReplication += ic.methodology + ic.result + ic.extensionMethodology;
-    totalBackground += ic.background;
-    if (ic.replication > 0) papersWithReplication++;
-  }
-  const topVenues = Array.from(venues.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4);
-  const topCategories = Array.from(categories.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4);
-  const hIndexish = papers
-    .map((s) => s.paper.citation_count)
-    .sort((a, b) => b - a)
-    .filter((c, i) => c >= i + 1).length;
-  // Per-paper intent breakdown — used to annotate each row in the paper list.
-  const intentByPaper = new Map(
-    papers.map((s) => [s.paper.id, getIntentCounts(s.paper.id)]),
-  );
-  // Most replicated paper by this author — the work others have actually built on
-  const mostReplicated = papers
-    .map((s) => ({ s, ic: intentByPaper.get(s.paper.id)! }))
-    .filter((r) => r.ic.replication > 0)
-    .sort((a, b) => b.ic.replication - a.ic.replication)[0];
-
-  // Top collaborators — co-authors who appear on at least 2 papers with this
-  // author, ranked by count. Sourced purely from the corpus author lists.
-  const collaboratorCounts = new Map<string, number>();
-  for (const s of papers) {
-    for (const a of s.paper.authors) {
-      if (normaliseName(a.name) === target) continue;
-      collaboratorCounts.set(a.name, (collaboratorCounts.get(a.name) ?? 0) + 1);
-    }
-  }
-  const topCollaborators = Array.from(collaboratorCounts.entries())
-    .filter(([, c]) => c >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
+  const stats = computeAuthorStats(decoded, result.scored, getIntentCounts);
+  const totalCitations = stats.citations_total;
+  const totalInCorpusCitedBy = stats.in_corpus_cited_by;
+  const totalReplication = stats.replication_total;
+  const totalBackground = stats.background_total;
+  const papersWithReplication = stats.papers_with_replication;
+  const topVenues = stats.top_venues;
+  const topCategories = stats.top_categories;
+  const hIndexish = stats.h_index_proxy;
+  const intentByPaper = stats.intent_by_paper;
+  const topCollaborators = stats.top_collaborators;
+  const mostReplicated = stats.most_replicated_paper_id
+    ? {
+        s: papers.find((s) => s.paper.id === stats.most_replicated_paper_id)!,
+        ic: intentByPaper.get(stats.most_replicated_paper_id)!,
+      }
+    : null;
 
   return (
     <>

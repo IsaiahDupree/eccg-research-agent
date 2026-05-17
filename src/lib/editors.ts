@@ -30,23 +30,46 @@ interface ApiTokenEntry {
   attribution: string; // alias or email used for audit when this token is used
 }
 
-// ECCG_API_TOKENS=tok1:isaiah@example.com,tok2:bot-cron — comma-separated
-// entries, each "token" or "token:attribution". Attribution shows up in
-// the review-audit log so we know which automation cast a decision.
-const API_TOKENS: ApiTokenEntry[] =
-  tokensEnv.length === 0
-    ? []
-    : tokensEnv
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((raw) => {
-          const idx = raw.indexOf(":");
-          return idx >= 0
-            ? { token: raw.slice(0, idx).trim(), attribution: raw.slice(idx + 1).trim() }
-            : { token: raw, attribution: "api-token" };
-        });
-const API_TOKEN_INDEX = new Map(API_TOKENS.map((t) => [t.token, t.attribution]));
+/**
+ * Parse an ECCG_API_TOKENS env-style spec: comma-separated entries, each
+ * `token` or `token:attribution`. Returns a Map(token → attribution).
+ * Exported so the parsing rules are independently testable.
+ */
+export function parseTokenSpec(spec: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const raw of spec.split(",").map((s) => s.trim()).filter(Boolean)) {
+    const idx = raw.indexOf(":");
+    const token = idx >= 0 ? raw.slice(0, idx).trim() : raw;
+    const attribution = idx >= 0 ? raw.slice(idx + 1).trim() : "api-token";
+    if (token) out.set(token, attribution || "api-token");
+  }
+  return out;
+}
+
+const API_TOKEN_INDEX = parseTokenSpec(tokensEnv);
+const API_TOKENS: ApiTokenEntry[] = Array.from(API_TOKEN_INDEX.entries()).map(
+  ([token, attribution]) => ({ token, attribution }),
+);
+
+/**
+ * Resolve an API token from a Request against the provided index. Looks
+ * at X-API-Token header, then Authorization: Bearer, then ?api_token=.
+ * Returns the attribution when matched, else null. Pure — tests pass
+ * any index they want, no env-mocking needed.
+ */
+export function lookupApiToken(
+  req: Request,
+  tokenIndex: Map<string, string>,
+): string | null {
+  if (tokenIndex.size === 0) return null;
+  const header =
+    req.headers.get("x-api-token") ??
+    (req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null);
+  const fromQuery = new URL(req.url).searchParams.get("api_token");
+  const token = (header ?? fromQuery ?? "").trim();
+  if (!token) return null;
+  return tokenIndex.get(token) ?? null;
+}
 
 export function isEditor(
   alias: string | null | undefined,
@@ -80,14 +103,7 @@ export function listEditorEmails(): string[] {
  * browser callers (curl, GitHub Actions, cron jobs).
  */
 export function readApiTokenAttribution(req: Request): string | null {
-  if (API_TOKEN_INDEX.size === 0) return null;
-  const header =
-    req.headers.get("x-api-token") ??
-    (req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null);
-  const fromQuery = new URL(req.url).searchParams.get("api_token");
-  const token = (header ?? fromQuery ?? "").trim();
-  if (!token) return null;
-  return API_TOKEN_INDEX.get(token) ?? null;
+  return lookupApiToken(req, API_TOKEN_INDEX);
 }
 
 export function hasApiTokens(): boolean {

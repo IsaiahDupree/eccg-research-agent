@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { loadCollab } from "@/lib/collab";
 import { isEditor } from "@/lib/editors";
+import { weightTallies } from "@/lib/votes_weighting";
 
 export const runtime = "nodejs";
 
@@ -20,41 +21,12 @@ export async function GET(req: Request) {
   if (detail) {
     return NextResponse.json({ votes, total_papers: Object.keys(votes).length });
   }
-  // Compact response: per-paper aggregate counts + editor-weighted net.
-  const compact: Record<
-    string,
-    {
-      up: number;
-      down: number;
-      net: number;
-      editor_up: number;
-      editor_down: number;
-      weighted_net: number;
-    }
-  > = {};
-  for (const [id, v] of Object.entries(votes)) {
-    let editorUp = 0;
-    let editorDown = 0;
-    for (const voter of v.voters) {
-      // Voter alias is the only signal we have on cast; check it against
-      // both the alias and email allowlists.
-      if (isEditor(voter.voter, voter.voter.includes("@") ? voter.voter : undefined)) {
-        if (voter.value === 1) editorUp++;
-        else if (voter.value === -1) editorDown++;
-      }
-    }
-    // Editor votes count 2x — that's the base 1 already counted in net,
-    // plus an extra 1 per editor vote here.
-    const weighted_net = v.net + (editorUp - editorDown);
-    compact[id] = {
-      up: v.upvotes,
-      down: v.downvotes,
-      net: v.net,
-      editor_up: editorUp,
-      editor_down: editorDown,
-      weighted_net,
-    };
-  }
+  // Voter alias is the only signal we have on cast; check it against both
+  // the alias and email allowlists (an alias that looks like an email is
+  // also exposed to the email allowlist).
+  const isEditorVoter = (voter: string) =>
+    isEditor(voter, voter.includes("@") ? voter : undefined);
+  const compact = weightTallies(votes, isEditorVoter);
   return NextResponse.json({
     votes: compact,
     total_papers: Object.keys(compact).length,

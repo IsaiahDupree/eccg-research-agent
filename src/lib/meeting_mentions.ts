@@ -9,6 +9,7 @@
  */
 
 import { extractMentionsLexical } from "./analysis/paper_mentions";
+import type { Meeting, Paper } from "./models";
 import { loadSeedPipeline } from "./seed";
 import { loadSeedMeetings } from "./seed_meetings";
 
@@ -22,13 +23,26 @@ export interface MeetingMentionEntry {
 let cached: Record<string, MeetingMentionEntry[]> | null = null;
 
 export function getMeetingMentionsFor(paperId: string): MeetingMentionEntry[] {
-  if (!cached) cached = buildIndex();
+  if (!cached) {
+    cached = buildMeetingMentionsIndex(loadSeedMeetings(), loadSeedPipeline().raw.papers);
+  }
   return cached[paperId] ?? [];
 }
 
-function buildIndex(): Record<string, MeetingMentionEntry[]> {
-  const meetings = loadSeedMeetings();
-  const corpus = loadSeedPipeline().raw.papers;
+/** Test-only: clear the memoised cache so a fresh build runs. */
+export function __resetMeetingMentionsCache(): void {
+  cached = null;
+}
+
+/**
+ * Pure builder — takes meetings + corpus, returns the paper_id → meetings
+ * reverse index. Tests inject controlled fixtures here instead of going
+ * through the seed loaders.
+ */
+export function buildMeetingMentionsIndex(
+  meetings: Meeting[],
+  corpus: Paper[],
+): Record<string, MeetingMentionEntry[]> {
   const out: Record<string, MeetingMentionEntry[]> = {};
   for (const m of meetings) {
     const mentions = extractMentionsLexical(m.transcript, corpus);
@@ -42,7 +56,7 @@ function buildIndex(): Record<string, MeetingMentionEntry[]> {
       });
     }
   }
-  // Sort each list by recency
+  // Sort each list by recency (newest meeting first)
   for (const k of Object.keys(out)) {
     out[k].sort((a, b) => b.held_at.localeCompare(a.held_at));
   }
