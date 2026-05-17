@@ -11,6 +11,7 @@
  */
 
 import { withCache } from "../cache";
+import { fetchWithRetry } from "../fetch_retry";
 import type { Paper } from "../models";
 
 const S2_API = "https://api.semanticscholar.org/graph/v1";
@@ -58,7 +59,17 @@ function headers(): HeadersInit {
 export async function fetchS2ByArxivId(arxivId: string): Promise<S2Paper | null> {
   const url = `${S2_API}/paper/ARXIV:${encodeURIComponent(arxivId)}?fields=${FIELDS}`;
   return withCache("s2", { url }, async () => {
-    const res = await fetch(url, { headers: headers() });
+    const res = await fetchWithRetry(
+      url,
+      { headers: headers() },
+      {
+        maxAttempts: 4,
+        baseMs: 1500,
+        // S2's anonymous tier 429s hard — give it generous backoff.
+        onRetry: (n, reason, wait) =>
+          console.warn(`[s2] retry ${n} after ${reason} — waiting ${wait}ms`),
+      },
+    );
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`S2 API ${res.status}: ${res.statusText}`);
     return (await res.json()) as S2Paper;

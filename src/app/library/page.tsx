@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Download, FileText, RefreshCw } from "lucide-react";
+import { Bookmark, Download, FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
 import { loadSeedPipelineClient } from "@/lib/seed_client";
 import { useLibrary, clearLibraryCache } from "@/lib/library_client";
 import { useVotes } from "@/lib/votes_client";
@@ -38,6 +38,12 @@ export default function LibraryPage() {
     a.download = `eccg-library-${new Date().toISOString().slice(0, 10)}.bib`;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  function exportCsv() {
+    // Defer to the server-side route so the CSV shape stays consistent
+    // with curl users hitting /api/library/export?format=csv.
+    window.location.href = "/api/library/export?format=csv";
   }
 
   async function exportMarkdown() {
@@ -143,11 +149,20 @@ export default function LibraryPage() {
             </button>
             <button
               type="button"
+              onClick={exportCsv}
+              disabled={visible.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+              title="Spreadsheet-friendly: one row per paper"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" /> CSV
+            </button>
+            <button
+              type="button"
               onClick={exportBibtex}
               disabled={visible.length === 0}
               className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
             >
-              <Download className="h-3.5 w-3.5" /> Export BibTeX
+              <Download className="h-3.5 w-3.5" /> BibTeX
             </button>
           </div>
         </div>

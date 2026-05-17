@@ -46,11 +46,23 @@ const VOTES_STATE = "votes";
 
 export async function loadCollab() {
   const { readState } = await import("./google/state");
-  const [library, notes, votes] = await Promise.all([
-    readState<CollabLibraryItem[]>(LIB_STATE, []),
-    readState<Record<string, CollabNote[]>>(NOTES_STATE, {}),
-    readState<Record<string, CollabVotesPerPaper>>(VOTES_STATE, {}),
+  const {
+    LibraryStateSchema,
+    NotesStateSchema,
+    VotesStateSchema,
+    safeParseDriveState,
+  } = await import("./state_schemas");
+  const [libRaw, notesRaw, votesRaw] = await Promise.all([
+    readState<unknown>(LIB_STATE, []),
+    readState<unknown>(NOTES_STATE, {}),
+    readState<unknown>(VOTES_STATE, {}),
   ]);
+  const library = safeParseDriveState(LIB_STATE, libRaw, LibraryStateSchema, [])
+    .value as CollabLibraryItem[];
+  const notes = safeParseDriveState(NOTES_STATE, notesRaw, NotesStateSchema, {})
+    .value as Record<string, CollabNote[]>;
+  const votes = safeParseDriveState(VOTES_STATE, votesRaw, VotesStateSchema, {})
+    .value as Record<string, CollabVotesPerPaper>;
   return { library, notes, votes };
 }
 

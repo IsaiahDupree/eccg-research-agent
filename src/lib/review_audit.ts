@@ -11,6 +11,7 @@
  */
 
 import { readState, writeState } from "./google/state";
+import { AuditStateSchema, safeParseDriveState } from "./state_schemas";
 
 export const AUDIT_STATE = "review-audit";
 const AUDIT_CAP = 2_000;
@@ -27,7 +28,9 @@ export interface AuditEntry {
 }
 
 export async function loadAudit(): Promise<AuditEntry[]> {
-  return readState<AuditEntry[]>(AUDIT_STATE, []);
+  const raw = await readState<unknown>(AUDIT_STATE, []);
+  const parsed = safeParseDriveState(AUDIT_STATE, raw, AuditStateSchema, []);
+  return parsed.value as AuditEntry[];
 }
 
 export async function appendAudit(entry: AuditEntry): Promise<void> {

@@ -12,6 +12,7 @@
 
 import { readState, writeState } from "./google/state";
 import type { Paper } from "./models";
+import { CustomCorpusSchema, safeParseDriveState } from "./state_schemas";
 
 export const CUSTOM_CORPUS_STATE = "custom-corpus";
 
@@ -30,7 +31,9 @@ export interface UploadedRecord {
 }
 
 export async function loadCustomCorpus(): Promise<UploadedRecord[]> {
-  return readState<UploadedRecord[]>(CUSTOM_CORPUS_STATE, []);
+  const raw = await readState<unknown>(CUSTOM_CORPUS_STATE, []);
+  const parsed = safeParseDriveState(CUSTOM_CORPUS_STATE, raw, CustomCorpusSchema, []);
+  return parsed.value as UploadedRecord[];
 }
 
 export async function saveCustomCorpus(records: UploadedRecord[]): Promise<void> {

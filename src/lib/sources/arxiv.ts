@@ -10,6 +10,7 @@
 
 import { XMLParser } from "fast-xml-parser";
 import { withCache } from "../cache";
+import { fetchWithRetry } from "../fetch_retry";
 import type { Paper, Niche } from "../models";
 import { isLikelyEventCameraPaper, ECCG_CORE_KEYWORDS } from "../taxonomy";
 
@@ -115,9 +116,16 @@ export async function fetchArxivPapers(opts: ArxivFetchOpts = {}): Promise<Paper
   const cacheKey = { url, niche };
 
   return withCache("arxiv", cacheKey, async () => {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "eccg-research-agent/0.1 (mailto:isaiahdupree33@gmail.com)" },
-    });
+    const res = await fetchWithRetry(
+      url,
+      { headers: { "User-Agent": "eccg-research-agent/0.1 (mailto:isaiahdupree33@gmail.com)" } },
+      {
+        maxAttempts: 4,
+        baseMs: 1000,
+        onRetry: (n, reason, wait) =>
+          console.warn(`[arxiv] retry ${n} after ${reason} — waiting ${wait}ms`),
+      },
+    );
     if (!res.ok) {
       throw new Error(`arXiv API ${res.status}: ${res.statusText}`);
     }
@@ -152,9 +160,11 @@ export async function fetchArxivPaperById(arxivId: string): Promise<Paper | null
   const cleanId = arxivId.replace(/^arxiv[-:]/i, "").replace(/v\d+$/i, "");
   const params = new URLSearchParams({ id_list: cleanId, max_results: "1" });
   const url = `${ARXIV_API}?${params}`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": "eccg-research-agent/0.1 (mailto:isaiahdupree33@gmail.com)" },
-  });
+  const res = await fetchWithRetry(
+    url,
+    { headers: { "User-Agent": "eccg-research-agent/0.1 (mailto:isaiahdupree33@gmail.com)" } },
+    { maxAttempts: 3, baseMs: 1000 },
+  );
   if (!res.ok) return null;
   const xml = await res.text();
   const parsed = parser.parse(xml) as { feed?: { entry?: ArxivAtomEntry | ArxivAtomEntry[] } };

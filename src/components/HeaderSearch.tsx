@@ -21,7 +21,9 @@ export function HeaderSearch() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const next = q.trim();
-    router.push(next ? `/?q=${encodeURIComponent(next)}` : "/");
+    // Global search hits /search; users can still filter the homepage
+    // in place via the inline FilterBar search input.
+    router.push(next ? `/search?q=${encodeURIComponent(next)}` : "/search");
   }
 
   return (
@@ -36,7 +38,7 @@ export function HeaderSearch() {
         type="search"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search papers, authors, abstracts…"
+        placeholder="Search papers, meetings, library…"
         className="w-64 bg-transparent outline-none placeholder:text-muted-foreground"
         aria-label="Search corpus"
       />

@@ -15,6 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { fetchWithRetry } from "./fetch_retry";
 import type { Paper } from "./models";
 import { readState, writeState } from "./google/state";
 
@@ -49,14 +50,23 @@ function paperInput(p: Paper): string {
 
 async function callOpenAiEmbeddings(inputs: string[]): Promise<number[][]> {
   const apiKey = process.env.OPENAI_API_KEY!.trim();
-  const res = await fetch(API, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
+  const res = await fetchWithRetry(
+    API,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ model: MODEL, input: inputs, dimensions: DIMENSIONS }),
     },
-    body: JSON.stringify({ model: MODEL, input: inputs, dimensions: DIMENSIONS }),
-  });
+    {
+      maxAttempts: 4,
+      baseMs: 1000,
+      onRetry: (n, reason, wait) =>
+        console.warn(`[openai-embeddings] retry ${n} after ${reason} — waiting ${wait}ms`),
+    },
+  );
   if (!res.ok) {
     throw new Error(
       `OpenAI embeddings ${res.status}: ${(await res.text()).slice(0, 200)}`,
