@@ -16,7 +16,13 @@ import {
   saveCustomCorpus,
   statusOf,
 } from "@/lib/custom_corpus";
-import { isEditor, isEditorsEnforced, listEditors, listEditorEmails } from "@/lib/editors";
+import {
+  isEditor,
+  isEditorsEnforced,
+  listEditors,
+  listEditorEmails,
+  readApiTokenAttribution,
+} from "@/lib/editors";
 import { appendAudit } from "@/lib/review_audit";
 
 export const runtime = "nodejs";
@@ -41,7 +47,8 @@ export async function POST(req: Request) {
 
   const session = readSessionFromRequest(req);
   const user = (body.user ?? session?.email ?? "anonymous").toString().slice(0, 80);
-  if (!isEditor(user, session?.email)) {
+  const tokenAttribution = readApiTokenAttribution(req);
+  if (!tokenAttribution && !isEditor(user, session?.email)) {
     return NextResponse.json(
       {
         ok: false,
@@ -80,7 +87,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, changed: 0 });
   }
 
-  const reviewedBy = session?.email ?? user;
+  const reviewedBy = tokenAttribution ?? session?.email ?? user;
   const reviewedAt = new Date().toISOString();
   const note = body.note?.slice(0, 400);
 

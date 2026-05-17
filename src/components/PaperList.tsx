@@ -111,13 +111,16 @@ export function PaperList({ scored }: PaperListProps) {
     };
 
     const decorated: Decorated[] = merged.map((s) => {
-      const net = votes[s.paper.id]?.net ?? 0;
-      const boost = communityBoost(net);
+      // Use editor-weighted net for ranking — that's the same signal the
+      // leaderboard's influence mode uses, so the two views stay coherent.
+      const tally = votes[s.paper.id];
+      const weighted = tally?.weighted_net ?? tally?.net ?? 0;
+      const boost = communityBoost(weighted);
       return {
         scored: s,
         adjusted: Math.min(100, s.total + boost),
-        hot: hotness(net, s.paper.months_since_publish),
-        net,
+        hot: hotness(weighted, s.paper.months_since_publish),
+        net: weighted,
       };
     });
 

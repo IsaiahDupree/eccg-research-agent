@@ -19,7 +19,13 @@ import {
   saveCustomCorpus,
   type UploadedRecord,
 } from "@/lib/custom_corpus";
-import { isEditor, isEditorsEnforced, listEditors, listEditorEmails } from "@/lib/editors";
+import {
+  isEditor,
+  isEditorsEnforced,
+  listEditors,
+  listEditorEmails,
+  readApiTokenAttribution,
+} from "@/lib/editors";
 import { fetchArxivPaperById } from "@/lib/sources/arxiv";
 
 export const runtime = "nodejs";
@@ -42,7 +48,8 @@ export async function POST(req: Request) {
 
   const session = readSessionFromRequest(req);
   const user = (body.user ?? session?.email ?? "anonymous").toString().slice(0, 80);
-  if (!isEditor(user, session?.email)) {
+  const tokenAttribution = readApiTokenAttribution(req);
+  if (!tokenAttribution && !isEditor(user, session?.email)) {
     return NextResponse.json(
       {
         ok: false,
@@ -77,13 +84,13 @@ export async function POST(req: Request) {
   }
 
   const now = new Date().toISOString();
-  const reviewer = session?.email ?? user;
+  const reviewer = tokenAttribution ?? session?.email ?? user;
   const record: UploadedRecord = {
     paper,
     score_base:
       (paper.eccg_relevance ?? 0) * 55 +
       Math.exp(-paper.months_since_publish / 12) * 35,
-    uploaded_by: user,
+    uploaded_by: tokenAttribution ?? user,
     uploaded_at: now,
     source_file: "gap-ingest",
     status: "approved",

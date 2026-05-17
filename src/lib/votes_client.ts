@@ -12,6 +12,11 @@ export interface VoteTally {
   up: number;
   down: number;
   net: number;
+  /** Editor-weighted net: editor votes count 2× via the API. */
+  weighted_net?: number;
+  /** Up/down votes cast by editors (subset of up/down). */
+  editor_up?: number;
+  editor_down?: number;
   /** Set client-side to remember this user's vote between renders. */
   my?: 1 | -1 | 0;
 }

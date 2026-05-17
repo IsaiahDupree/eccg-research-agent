@@ -11,6 +11,8 @@ import { NotesPanel } from "@/components/NotesPanel";
 import { VoteWidget } from "@/components/VoteWidget";
 import { CompareWithLibraryButton } from "@/components/CompareWithLibraryButton";
 import { getCitationEdges, getIntentCounts } from "@/lib/citations";
+import { getMeetingMentionsFor } from "@/lib/meeting_mentions";
+import { Mic } from "lucide-react";
 
 export const dynamicParams = true;
 
@@ -301,6 +303,45 @@ export default async function PaperPage({ params }: Params) {
               })()}
           </section>
         )}
+
+        {(() => {
+          const mentions = getMeetingMentionsFor(scored.paper.id);
+          if (mentions.length === 0) return null;
+          return (
+            <section className="mt-8 rounded-lg border bg-card p-4">
+              <h2 className="flex items-center gap-2 text-base font-medium">
+                <Mic className="h-4 w-4 text-muted-foreground" aria-hidden />
+                Discussed in meetings ({mentions.length})
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Live transcripts where this paper came up — read the surrounding
+                excerpt before quoting, since the lexical extractor matches by
+                title prefix and arXiv id.
+              </p>
+              <ul className="mt-3 space-y-3 text-sm">
+                {mentions.map((m, i) => (
+                  <li
+                    key={`${m.meeting_id}-${i}`}
+                    className="border-l-2 border-muted pl-3"
+                  >
+                    <Link
+                      href={`/meetings/${m.meeting_id}`}
+                      className="font-medium hover:underline"
+                    >
+                      {m.meeting_title}
+                    </Link>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {new Date(m.held_at).toLocaleDateString()}
+                    </span>
+                    <p className="mt-1 line-clamp-3 text-muted-foreground">
+                      …{m.excerpt.trim()}…
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })()}
 
         <NotesPanel paperId={scored.paper.id} />
 

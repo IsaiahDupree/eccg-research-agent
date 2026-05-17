@@ -13,7 +13,13 @@ import {
   loadCustomCorpus,
   saveCustomCorpus,
 } from "@/lib/custom_corpus";
-import { isEditor, isEditorsEnforced, listEditors, listEditorEmails } from "@/lib/editors";
+import {
+  isEditor,
+  isEditorsEnforced,
+  listEditors,
+  listEditorEmails,
+  readApiTokenAttribution,
+} from "@/lib/editors";
 import { appendAudit } from "@/lib/review_audit";
 
 export const runtime = "nodejs";
@@ -35,7 +41,9 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  if (!isEditor(user, session?.email)) {
+  // API token grants editor privileges + supplies the audit attribution.
+  const tokenAttribution = readApiTokenAttribution(req);
+  if (!tokenAttribution && !isEditor(user, session?.email)) {
     return NextResponse.json(
       {
         ok: false,
@@ -53,10 +61,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "paper not found" }, { status: 404 });
   }
   const reviewedAt = new Date().toISOString();
+  const actor = tokenAttribution ?? session?.email ?? user;
   records[idx] = {
     ...records[idx],
     status: action === "approve" ? "approved" : "rejected",
-    reviewed_by: session?.email ?? user,
+    reviewed_by: actor,
     reviewed_at: reviewedAt,
     review_note: body.note?.slice(0, 400),
   };
@@ -66,7 +75,7 @@ export async function POST(req: Request) {
   // the actual review write.
   appendAudit({
     at: reviewedAt,
-    actor: session?.email ?? user,
+    actor,
     action,
     paper_ids: [paper_id],
     note: body.note?.slice(0, 200),

@@ -8,6 +8,8 @@ import { VoteWidget } from "@/components/VoteWidget";
 import { loadSeedPipelineClient } from "@/lib/seed_client";
 import { useVotes, hotness } from "@/lib/votes_client";
 import { getIntentCounts } from "@/lib/citations";
+import { matchesNiche, NICHES, DEFAULT_NICHE } from "@/lib/niches";
+import { useNiche } from "@/lib/niche_client";
 import { categoryLabel, formatMonthsAgo } from "@/lib/utils";
 import type { ScoredPaper } from "@/lib/models";
 import { cn } from "@/lib/utils";
@@ -182,32 +184,52 @@ export default function LeaderboardPage() {
   const [scored, setScored] = useState<ScoredPaper[]>([]);
   const [mode, setMode] = useState<Mode>("top");
   const { votes, loaded } = useVotes();
+  const { niche, set: setNiche, mounted } = useNiche();
 
   useEffect(() => {
     setScored(loadSeedPipelineClient().scored);
   }, []);
 
-  const byId = useMemo(() => new Map(scored.map((s) => [s.paper.id, s])), [scored]);
+  // Apply the niche filter once data is mounted. event_camera is permissive
+  // (matchesNiche short-circuits to true), so the default behaviour is
+  // unchanged unless the user actively switches.
+  const nicheFilteredScored = useMemo(() => {
+    if (!mounted || niche.slug === DEFAULT_NICHE.slug) return scored;
+    return scored.filter((s) =>
+      matchesNiche(`${s.paper.title} ${s.paper.abstract}`, niche),
+    );
+  }, [scored, niche, mounted]);
+
+  const byId = useMemo(
+    () => new Map(nicheFilteredScored.map((s) => [s.paper.id, s])),
+    [nicheFilteredScored],
+  );
 
   const ranked = useMemo(() => {
     // Influence mode considers every paper in the corpus, not just papers
     // that have been voted on — because in-corpus replication is its own
     // signal even before the team casts votes.
     if (mode === "influence") {
-      const rows = scored
+      const rows = nicheFilteredScored
         .map((s) => {
           const v = votes[s.paper.id] ?? { up: 0, down: 0, net: 0 };
+          const weighted = v.weighted_net ?? v.net;
           const ic = getIntentCounts(s.paper.id);
+          // Editor-weighted votes feed influence — that's the signal we
+          // explicitly trust more than anonymous casts.
           const inf =
             ic.replication * 2 +
             ic.total * 0.5 +
-            v.net * 1.5;
+            weighted * 1.5;
           return {
             scored: s,
             up: v.up,
             down: v.down,
             net: v.net,
-            hot: hotness(v.net, s.paper.months_since_publish),
+            weighted_net: weighted,
+            editor_up: v.editor_up ?? 0,
+            editor_down: v.editor_down ?? 0,
+            hot: hotness(weighted, s.paper.months_since_publish),
             controversy: Math.min(v.up, v.down) * Math.log2(v.up + v.down + 1),
             replication: ic.replication,
             cited_by: ic.total,
@@ -224,12 +246,16 @@ export default function LeaderboardPage() {
         const s = byId.get(id);
         if (!s) return null;
         const ic = getIntentCounts(id);
+        const weighted = v.weighted_net ?? v.net;
         return {
           scored: s,
           up: v.up,
           down: v.down,
           net: v.net,
-          hot: hotness(v.net, s.paper.months_since_publish),
+          weighted_net: weighted,
+          editor_up: v.editor_up ?? 0,
+          editor_down: v.editor_down ?? 0,
+          hot: hotness(weighted, s.paper.months_since_publish),
           controversy: Math.min(v.up, v.down) * Math.log2(v.up + v.down + 1),
           replication: ic.replication,
           cited_by: ic.total,
@@ -238,11 +264,11 @@ export default function LeaderboardPage() {
       })
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
 
-    if (mode === "top") rows.sort((a, b) => b.net - a.net || b.up - a.up);
+    if (mode === "top") rows.sort((a, b) => b.weighted_net - a.weighted_net || b.up - a.up);
     else if (mode === "hot") rows.sort((a, b) => b.hot - a.hot);
     else rows.sort((a, b) => b.controversy - a.controversy);
     return rows;
-  }, [scored, votes, byId, mode]);
+  }, [nicheFilteredScored, votes, byId, mode]);
 
   return (
     <>
@@ -257,7 +283,7 @@ export default function LeaderboardPage() {
         </p>
       </section>
 
-      <div className="mb-4 flex flex-wrap items-center gap-1 text-sm">
+      <div className="mb-3 flex flex-wrap items-center gap-1 text-sm">
         {MODES.map(({ mode: m, label, Icon, help }) => (
           <button
             key={m}
@@ -276,8 +302,34 @@ export default function LeaderboardPage() {
           </button>
         ))}
         <span className="ml-2 text-xs text-muted-foreground">
-          {ranked.length.toLocaleString()} paper{ranked.length === 1 ? "" : "s"} voted on
+          {ranked.length.toLocaleString()} paper{ranked.length === 1 ? "" : "s"}{" "}
+          {mode === "influence" ? "ranked" : "voted on"}
         </span>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-1 text-xs">
+        <span className="mr-1 text-muted-foreground">Niche:</span>
+        {NICHES.map((n) => (
+          <button
+            key={n.slug}
+            type="button"
+            onClick={() => setNiche(n.slug)}
+            aria-pressed={niche.slug === n.slug}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5",
+              niche.slug === n.slug
+                ? "border-accent bg-accent text-accent-foreground"
+                : "hover:bg-muted",
+            )}
+          >
+            {n.label}
+          </button>
+        ))}
+        {niche.slug !== DEFAULT_NICHE.slug && (
+          <span className="ml-2 text-muted-foreground">
+            {nicheFilteredScored.length} / {scored.length} papers in scope
+          </span>
+        )}
       </div>
 
       {mode === "influence" && ranked.length > 0 && (
@@ -343,6 +395,11 @@ export default function LeaderboardPage() {
                     <span className="text-emerald-700 dark:text-emerald-400">↑{row.up}</span>
                     {" / "}
                     <span className="text-rose-700 dark:text-rose-400">↓{row.down}</span>
+                    {(row.editor_up > 0 || row.editor_down > 0) && (
+                      <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-300" title="Editor votes count 2× in influence math">
+                        ★{row.editor_up + row.editor_down}
+                      </span>
+                    )}
                   </div>
                   {mode === "hot" && <div>hot {row.hot.toFixed(2)}</div>}
                   {mode === "controversial" && (

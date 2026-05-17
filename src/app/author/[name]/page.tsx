@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, Users } from "lucide-react";
+import { ExternalLink, GitBranch, Users } from "lucide-react";
 import { loadSeedPipeline } from "@/lib/seed";
 import { PaperRow } from "@/components/PaperRow";
+import { Badge } from "@/components/Badge";
 import { getIntentCounts } from "@/lib/citations";
 
 export const dynamicParams = true;
@@ -73,11 +74,29 @@ export default async function AuthorPage({ params }: Params) {
     .map((s) => s.paper.citation_count)
     .sort((a, b) => b - a)
     .filter((c, i) => c >= i + 1).length;
+  // Per-paper intent breakdown — used to annotate each row in the paper list.
+  const intentByPaper = new Map(
+    papers.map((s) => [s.paper.id, getIntentCounts(s.paper.id)]),
+  );
   // Most replicated paper by this author — the work others have actually built on
   const mostReplicated = papers
-    .map((s) => ({ s, ic: getIntentCounts(s.paper.id) }))
+    .map((s) => ({ s, ic: intentByPaper.get(s.paper.id)! }))
     .filter((r) => r.ic.replication > 0)
     .sort((a, b) => b.ic.replication - a.ic.replication)[0];
+
+  // Top collaborators — co-authors who appear on at least 2 papers with this
+  // author, ranked by count. Sourced purely from the corpus author lists.
+  const collaboratorCounts = new Map<string, number>();
+  for (const s of papers) {
+    for (const a of s.paper.authors) {
+      if (normaliseName(a.name) === target) continue;
+      collaboratorCounts.set(a.name, (collaboratorCounts.get(a.name) ?? 0) + 1);
+    }
+  }
+  const topCollaborators = Array.from(collaboratorCounts.entries())
+    .filter(([, c]) => c >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
 
   return (
     <>
@@ -142,7 +161,7 @@ export default async function AuthorPage({ params }: Params) {
         )}
       </section>
 
-      <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Mini title="Venues">
           {topVenues.map(([v, c]) => (
             <li key={v} className="flex items-baseline justify-between text-xs">
@@ -164,15 +183,65 @@ export default async function AuthorPage({ params }: Params) {
             </li>
           ))}
         </Mini>
+        <Mini title="Top collaborators">
+          {topCollaborators.length === 0 ? (
+            <li className="text-xs text-muted-foreground italic">
+              No co-authors with ≥ 2 joint papers in corpus.
+            </li>
+          ) : (
+            topCollaborators.map(([name, c]) => (
+              <li key={name} className="flex items-baseline justify-between text-xs">
+                <Link
+                  href={`/author/${encodeURIComponent(name)}`}
+                  className="truncate hover:underline"
+                >
+                  {name}
+                </Link>
+                <span className="ml-2 tabular-nums text-muted-foreground">{c}</span>
+              </li>
+            ))
+          )}
+        </Mini>
       </section>
 
       <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
         Papers
       </h2>
       <div className="rounded-lg border">
-        {papers.map((s, i) => (
-          <PaperRow key={s.paper.id} scored={s} rank={i + 1} />
-        ))}
+        {papers.map((s, i) => {
+          const ic = intentByPaper.get(s.paper.id);
+          return (
+            <div key={s.paper.id}>
+              <PaperRow scored={s} rank={i + 1} />
+              {ic && ic.total > 0 && (
+                <div className="-mt-2 ml-12 mb-3 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <GitBranch className="h-3 w-3" />
+                  in-corpus cited by <strong>{ic.total}</strong>
+                  {ic.methodology > 0 && (
+                    <Badge variant="success" className="text-[10px]">
+                      {ic.methodology} methodology
+                    </Badge>
+                  )}
+                  {ic.result > 0 && (
+                    <Badge variant="success" className="text-[10px]">
+                      {ic.result} result
+                    </Badge>
+                  )}
+                  {ic.extensionMethodology > 0 && (
+                    <Badge variant="success" className="text-[10px]">
+                      {ic.extensionMethodology} extension
+                    </Badge>
+                  )}
+                  {ic.background > 0 && (
+                    <Badge variant="muted" className="text-[10px]">
+                      {ic.background} background
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <p className="mt-6 text-xs text-muted-foreground">
