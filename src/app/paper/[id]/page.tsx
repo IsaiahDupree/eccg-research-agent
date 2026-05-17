@@ -9,6 +9,8 @@ import { fixtureDigest } from "@/lib/llm/provider";
 import { getNeighbors } from "@/lib/similarity";
 import { NotesPanel } from "@/components/NotesPanel";
 import { VoteWidget } from "@/components/VoteWidget";
+import { CompareWithLibraryButton } from "@/components/CompareWithLibraryButton";
+import { getCitationEdges } from "@/lib/citations";
 
 export const dynamicParams = true;
 
@@ -49,6 +51,17 @@ export default async function PaperPage({ params }: Params) {
     );
     related = [...related, ...extras].slice(0, 4);
   }
+
+  // In-corpus citation graph
+  const edges = getCitationEdges(scored.paper.id);
+  const cites = edges.cites
+    .map((id) => byId.get(id))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s))
+    .sort((a, b) => b.total - a.total);
+  const citedBy = edges.cited_by
+    .map((id) => byId.get(id))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s))
+    .sort((a, b) => b.total - a.total);
 
   return (
     <article className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
@@ -97,6 +110,7 @@ export default async function PaperPage({ params }: Params) {
               <GitCompareArrows className="h-4 w-4" /> Compare with related
             </Link>
           )}
+          <CompareWithLibraryButton currentPaperId={scored.paper.id} />
           {scored.paper.html_url && (
             <a
               href={scored.paper.html_url}
@@ -168,6 +182,75 @@ export default async function PaperPage({ params }: Params) {
             {scored.paper.abstract}
           </p>
         </section>
+
+        {(cites.length > 0 || citedBy.length > 0) && (
+          <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {cites.length > 0 && (
+              <div className="rounded-lg border p-4">
+                <h3 className="text-sm font-medium">
+                  Cites in corpus{" "}
+                  <span className="text-muted-foreground">({cites.length})</span>
+                </h3>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Papers this one explicitly references that are also in the ECCG corpus.
+                </p>
+                <ul className="mt-2 space-y-2 text-sm">
+                  {cites.slice(0, 8).map((c) => (
+                    <li key={c.paper.id}>
+                      <Link
+                        href={`/paper/${encodeURIComponent(c.paper.id)}`}
+                        className="line-clamp-2 hover:underline"
+                      >
+                        {c.paper.title}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">
+                        score {c.total.toFixed(0)} · {c.paper.citation_count} citations
+                      </div>
+                    </li>
+                  ))}
+                  {cites.length > 8 && (
+                    <li className="text-xs text-muted-foreground">
+                      …and {cites.length - 8} more
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {citedBy.length > 0 && (
+              <div className="rounded-lg border p-4">
+                <h3 className="text-sm font-medium">
+                  Cited by{" "}
+                  <span className="text-muted-foreground">({citedBy.length})</span>
+                </h3>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Other corpus papers that reference this one — a proxy for
+                  community influence and replication.
+                </p>
+                <ul className="mt-2 space-y-2 text-sm">
+                  {citedBy.slice(0, 8).map((c) => (
+                    <li key={c.paper.id}>
+                      <Link
+                        href={`/paper/${encodeURIComponent(c.paper.id)}`}
+                        className="line-clamp-2 hover:underline"
+                      >
+                        {c.paper.title}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">
+                        score {c.total.toFixed(0)} ·{" "}
+                        {formatMonthsAgo(c.paper.months_since_publish)}
+                      </div>
+                    </li>
+                  ))}
+                  {citedBy.length > 8 && (
+                    <li className="text-xs text-muted-foreground">
+                      …and {citedBy.length - 8} more
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
 
         <NotesPanel paperId={scored.paper.id} />
 

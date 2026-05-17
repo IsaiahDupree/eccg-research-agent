@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { loadSeedPipelineClient } from "@/lib/seed_client";
 import { Badge } from "@/components/Badge";
+import { ActivitySparkline } from "@/components/ActivitySparkline";
 import { categoryLabel } from "@/lib/utils";
 import type { ScoredPaper } from "@/lib/models";
 
@@ -204,6 +205,9 @@ export default function WhatsNewPage() {
           <Stat label="Notes (7d)" value={counts.note} icon={<MessageSquare className="h-3.5 w-3.5" />} />
           <Stat label="Uploads (7d)" value={counts.upload} icon={<Upload className="h-3.5 w-3.5" />} />
         </dl>
+        <div className="mt-4">
+          <ActivitySparkline events={past7d.map((e) => ({ at: e.at, kind: e.kind }))} />
+        </div>
       </section>
 
       {!loaded ? (

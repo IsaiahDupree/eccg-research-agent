@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { assignRelevance } from "@/lib/analysis/relevance";
 import { readState, writeState } from "@/lib/google/state";
-import { sendTelegram, isTelegramConfigured, tgEscape } from "@/lib/notify";
+import { sendTelegram, isTelegramConfigured, htmlEscape, tgLink } from "@/lib/notify";
 import { fetchArxivPapers } from "@/lib/sources/arxiv";
+import { fetchArxivRssPapers } from "@/lib/sources/arxiv_rss";
 import type { Paper } from "@/lib/models";
 import seedJson from "@/fixtures/seed_papers.json" with { type: "json" };
 import eccgCorpus from "@/fixtures/eccg_corpus.json" with { type: "json" };
@@ -25,12 +26,13 @@ interface UploadedRecord {
 /**
  * Daily refresh — runs via Vercel cron (vercel.json) at 06:00 UTC.
  *
- *  1. Pull the most-recent batch of event-camera papers from arXiv.
- *  2. Diff against the static corpus + previously-persisted uploads.
- *  3. Persist the deltas to the shared Drive state file so they show up on
- *     `/` and `/whats-new` on the next page load — for everyone on the team.
- *
- * No LLM digest here (those are generated on-demand per paper).
+ *   1. Pull the latest event-camera papers from BOTH the arXiv search API
+ *      (catches anything we missed) and arXiv's per-category RSS feeds
+ *      (faster, not rate-limited).
+ *   2. Diff against bundled fixtures + previously-persisted state.
+ *   3. Append the new ones to `eccg-state—custom-corpus.json` on Drive so
+ *      `/`, `/whats-new`, RSS, and `/leaderboard` all pick them up.
+ *   4. Ping Telegram with a top-5 preview when ≥ REFRESH_NOTIFY_MIN added.
  */
 export async function GET(req: Request) {
   const expected = process.env.REFRESH_SECRET;
@@ -43,16 +45,25 @@ export async function GET(req: Request) {
   }
 
   try {
-    const fresh = await fetchArxivPapers({
-      niche: process.env.ECCG_NICHE ?? "event_camera",
-      maxResults: 100,
-      sortBy: "submittedDate",
-    });
+    const [searchPapers, rssPapers] = await Promise.all([
+      fetchArxivPapers({
+        niche: process.env.ECCG_NICHE ?? "event_camera",
+        maxResults: 100,
+        sortBy: "submittedDate",
+      }).catch(() => [] as Paper[]),
+      fetchArxivRssPapers().catch(() => [] as Paper[]),
+    ]);
+    const seen = new Set<string>();
+    const fresh: Paper[] = [];
+    for (const p of [...rssPapers, ...searchPapers]) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      fresh.push(p);
+    }
     assignRelevance(fresh);
 
-    // Dedup against bundled fixtures + Drive state — but DON'T re-run the
-    // full pipeline (that runs O(n²) TF-IDF on 1,100 papers and pushes us
-    // past Vercel's 60s function limit).
+    // Cheap id-set dedup — don't re-run loadSeedPipeline (O(n²) TF-IDF;
+    // would blow the 60s Hobby function limit).
     const knownIds = new Set<string>();
     for (const p of seedJson as { id: string }[]) knownIds.add(p.id);
     for (const s of eccgCorpus as { paper: { id: string } }[]) knownIds.add(s.paper.id);
@@ -82,19 +93,23 @@ export async function GET(req: Request) {
         .slice(0, 5)
         .map((a, i) => {
           const url = a.paper.html_url || `${SITE_URL}/paper/${encodeURIComponent(a.paper.id)}`;
-          return `${i + 1}. [${tgEscape(a.paper.title)}](${url})${a.paper.eccg_category ? ` _(${a.paper.eccg_category})_` : ""}`;
+          return `${i + 1}. ${tgLink(a.paper.title, url)}${a.paper.eccg_category ? ` <i>(${htmlEscape(a.paper.eccg_category)})</i>` : ""}`;
         })
         .join("\n");
-      const more = additions.length > 5 ? `\n_…and ${additions.length - 5} more_` : "";
+      const more = additions.length > 5 ? `\n<i>…and ${additions.length - 5} more</i>` : "";
       telegram = await sendTelegram(
-        `*${additions.length} new event-camera paper${additions.length === 1 ? "" : "s"}* on the ECCG agent\n\n${list}${more}\n\n${SITE_URL}/?sort=new`,
+        `<b>${additions.length} new event-camera paper${additions.length === 1 ? "" : "s"}</b> on the ECCG agent\n\n${list}${more}\n\n${htmlEscape(SITE_URL)}/?sort=new`,
       );
     }
 
     return NextResponse.json({
       ok: true,
       refreshed_at: new Date().toISOString(),
-      fetched: fresh.length,
+      sources: {
+        search: searchPapers.length,
+        rss: rssPapers.length,
+        deduped: fresh.length,
+      },
       added: additions.length,
       telegram,
       newest: additions.slice(0, 5).map((a) => ({
