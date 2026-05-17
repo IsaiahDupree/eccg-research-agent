@@ -25,7 +25,7 @@ function entryType(p: Paper): "article" | "inproceedings" | "misc" {
   return "misc"; // preprint / unknown
 }
 
-function escapeBibtex(s: string): string {
+export function escapeBibtex(s: string): string {
   // Curly-protect upper-case letters so BibTeX doesn't lowercase them, and
   // escape characters that break entries.
   return s
@@ -37,7 +37,16 @@ function escapeBibtex(s: string): string {
     .replace(/_/g, "\\_");
 }
 
-export function toBibtex(papers: Paper[]): string {
+export interface BibtexOptions {
+  /**
+   * Per-paper annotations to merge into each entry as the `annote` field —
+   * commonly used by tools that consume annotated bibliographies (Zotero,
+   * BibDesk). Pass `{ [paper.id]: "free-text annote" }` to fill the field.
+   */
+  annotations?: Record<string, string>;
+}
+
+export function toBibtex(papers: Paper[], opts: BibtexOptions = {}): string {
   return papers
     .map((p) => {
       const type = entryType(p);
@@ -59,6 +68,10 @@ export function toBibtex(papers: Paper[]): string {
       if (p.html_url) fields.push(["url", `{${p.html_url}}`]);
       if (p.abstract && p.abstract.length > 0) {
         fields.push(["abstract", `{${escapeBibtex(p.abstract).slice(0, 1500)}}`]);
+      }
+      const annote = opts.annotations?.[p.id];
+      if (annote && annote.length > 0) {
+        fields.push(["annote", `{${escapeBibtex(annote).slice(0, 4000)}}`]);
       }
       const body = fields.map(([k, v]) => `  ${k} = ${v}`).join(",\n");
       return `@${type}{${key},\n${body}\n}`;

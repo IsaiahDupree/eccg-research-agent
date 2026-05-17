@@ -14,7 +14,7 @@ import type { Paper } from "../models";
 const OA_API = "https://api.openalex.org";
 const CONTACT = "isaiahdupree33@gmail.com";
 
-interface OpenAlexWork {
+export interface OpenAlexWork {
   id: string; // canonical OA URL, e.g. "https://openalex.org/W2741809807"
   doi?: string;
   title?: string;
@@ -41,12 +41,12 @@ export interface OpenAlexHit {
   venue_name?: string;
 }
 
-function extractId(work: OpenAlexWork): string {
+export function extractId(work: OpenAlexWork): string {
   // OA ids look like "https://openalex.org/W123..." — strip prefix.
   return (work.id ?? "").replace("https://openalex.org/", "");
 }
 
-function shape(work: OpenAlexWork): OpenAlexHit {
+export function shape(work: OpenAlexWork): OpenAlexHit {
   return {
     openalex_id: extractId(work),
     doi: work.doi ?? work.ids?.doi,
@@ -56,6 +56,14 @@ function shape(work: OpenAlexWork): OpenAlexHit {
     oa_url: work.open_access?.oa_url ?? work.primary_location?.pdf_url,
     venue_name: work.primary_location?.source?.display_name,
   };
+}
+
+export function cleanDoi(doi: string): string {
+  return doi.replace(/^https?:\/\/doi\.org\//, "").trim();
+}
+
+export function cleanArxivId(arxivId: string): string {
+  return arxivId.replace(/^arxiv[-:]/i, "").replace(/v\d+$/i, "").trim();
 }
 
 async function fetchOA(path: string): Promise<unknown> {

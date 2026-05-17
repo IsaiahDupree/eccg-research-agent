@@ -9,6 +9,7 @@ import { fixtureDigest } from "@/lib/llm/provider";
 import { getNeighbors } from "@/lib/similarity";
 import { NotesPanel } from "@/components/NotesPanel";
 import { VoteWidget } from "@/components/VoteWidget";
+import { CitationVelocityChart } from "@/components/CitationVelocityChart";
 import { CompareWithLibraryButton } from "@/components/CompareWithLibraryButton";
 import { VoteReasonsPanel } from "@/components/VoteReasonsPanel";
 import { getCitationEdges, getIntentCounts } from "@/lib/citations";
@@ -54,6 +55,22 @@ export default async function PaperPage({ params }: Params) {
     );
     related = [...related, ...extras].slice(0, 4);
   }
+
+  // Corpus + venue baseline citations-per-month for the velocity chart.
+  const cpmValues = result.scored.map((s) => s.paper.citations_per_month || 0);
+  const sorted = [...cpmValues].sort((a, b) => a - b);
+  const corpusMedianCpm = sorted.length
+    ? sorted[Math.floor(sorted.length / 2)]
+    : 0;
+  const venueName = scored.paper.venue?.name;
+  const venueCpms = venueName
+    ? result.scored
+        .filter((s) => s.paper.venue?.name === venueName)
+        .map((s) => s.paper.citations_per_month || 0)
+        .sort((a, b) => a - b)
+    : [];
+  const venueMedianCpm =
+    venueCpms.length >= 3 ? venueCpms[Math.floor(venueCpms.length / 2)] : undefined;
 
   // In-corpus citation graph (edges now carry intent metadata)
   const edges = getCitationEdges(scored.paper.id);
@@ -343,6 +360,14 @@ export default async function PaperPage({ params }: Params) {
             </section>
           );
         })()}
+
+        {scored.paper.citation_count > 0 && (
+          <CitationVelocityChart
+            paper={scored.paper}
+            corpusMedianCpm={corpusMedianCpm}
+            venueMedianCpm={venueMedianCpm}
+          />
+        )}
 
         <VoteReasonsPanel paperId={scored.paper.id} />
 

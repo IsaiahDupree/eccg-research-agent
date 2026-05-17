@@ -2,9 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Download, FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
+import { Bookmark, Download, FileSpreadsheet, FileText, Loader2, RefreshCw } from "lucide-react";
 import { loadSeedPipelineClient } from "@/lib/seed_client";
-import { useLibrary, clearLibraryCache, type ReadingStatus } from "@/lib/library_client";
+import {
+  useLibrary,
+  clearLibraryCache,
+  updateLibraryEntry,
+  type ReadingStatus,
+} from "@/lib/library_client";
 import { useVotes } from "@/lib/votes_client";
 import { PaperRow } from "@/components/PaperRow";
 import { EmptyState } from "@/components/EmptyState";
@@ -33,6 +38,8 @@ export default function LibraryPage() {
   // Status filter — initialise from ?status= URL param so links are shareable.
   const [statusFilter, setStatusFilter] = useState<ReadingStatus | "all">("all");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URL(window.location.href).searchParams;
@@ -91,6 +98,37 @@ export default function LibraryPage() {
     }
   }
 
+  function toggleSelected(paperId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(paperId)) next.delete(paperId);
+      else next.add(paperId);
+      return next;
+    });
+  }
+
+  function selectAllVisible() {
+    setSelectedIds(new Set(visible.map((r) => r.saved.paper_id)));
+  }
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function bulkSetStatus(status: ReadingStatus) {
+    if (selectedIds.size === 0 || bulkBusy) return;
+    setBulkBusy(true);
+    try {
+      // Sequential — there's a per-actor rate limit and Drive state needs
+      // ordered writes anyway. With our small library sizes this is fine.
+      for (const id of selectedIds) {
+        await updateLibraryEntry(id, { reading_status: status });
+      }
+      setSelectedIds(new Set());
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   function exportBibtex() {
     const papers = visible.map(({ paper: s }) => s.paper);
     const header = `% ECCG team library — ${papers.length} papers, generated ${new Date().toISOString()}\n% https://eccg-research-agent.vercel.app/library\n\n`;
@@ -106,6 +144,12 @@ export default function LibraryPage() {
     // Defer to the server-side route so the CSV shape stays consistent
     // with curl users hitting /api/library/export?format=csv.
     window.location.href = "/api/library/export?format=csv";
+  }
+
+  function exportAnnotated() {
+    // Server-side path so the .bib has the full notes state merged into
+    // annote = {…} fields per paper.
+    window.location.href = "/api/library/export?format=bibtex&include_notes=1";
   }
 
   async function exportMarkdown() {
@@ -226,6 +270,15 @@ export default function LibraryPage() {
             >
               <Download className="h-3.5 w-3.5" /> BibTeX
             </button>
+            <button
+              type="button"
+              onClick={exportAnnotated}
+              disabled={visible.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+              title="BibTeX with team notes merged in as annote = {…}"
+            >
+              <Download className="h-3.5 w-3.5" /> Annotated
+            </button>
           </div>
         </div>
         {missing > 0 && (
@@ -236,6 +289,51 @@ export default function LibraryPage() {
           </p>
         )}
       </section>
+      {loaded && allVisible.length > 0 && selectedIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2 text-xs">
+          <span className="font-medium">
+            {selectedIds.size} selected
+          </span>
+          <span className="text-muted-foreground">— set status:</span>
+          <button
+            type="button"
+            onClick={() => bulkSetStatus("to_read")}
+            disabled={bulkBusy}
+            className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+          >
+            📚 To read
+          </button>
+          <button
+            type="button"
+            onClick={() => bulkSetStatus("reading")}
+            disabled={bulkBusy}
+            className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+          >
+            👀 Reading
+          </button>
+          <button
+            type="button"
+            onClick={() => bulkSetStatus("read")}
+            disabled={bulkBusy}
+            className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+          >
+            ✓ Read
+          </button>
+          {bulkBusy && (
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> applying…
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={bulkBusy}
+            className="ml-auto rounded-md border px-2 py-0.5 hover:bg-muted disabled:opacity-50"
+          >
+            Clear
+          </button>
+        </div>
+      )}
       {loaded && allVisible.length > 0 && (
         <div className="mb-3 space-y-2">
           <ReadingStatusFilter
@@ -312,18 +410,50 @@ export default function LibraryPage() {
             }
           />
         ) : (
-          <div className="rounded-lg border">
-            {visible.map((row, i) => (
-              <div key={row.saved.paper_id}>
-                <PaperRow scored={row.paper} rank={i + 1} />
-                <LibraryEntryControls item={row.saved} />
-                <div className="ml-12 mb-3 text-[11px] text-muted-foreground">
-                  Saved by <strong>{row.saved.added_by}</strong> ·{" "}
-                  {new Date(row.saved.added_at).toLocaleString()}
+          <>
+            <div className="mb-2 flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={
+                  selectedIds.size === visible.length ? clearSelection : selectAllVisible
+                }
+                className="rounded-md border px-2.5 py-1 hover:bg-muted"
+              >
+                {selectedIds.size === visible.length ? "Clear selection" : "Select all visible"}
+              </button>
+              {selectedIds.size > 0 && (
+                <span className="text-muted-foreground">
+                  {selectedIds.size} of {visible.length} selected
+                </span>
+              )}
+            </div>
+            <div className="rounded-lg border">
+              {visible.map((row, i) => (
+                <div
+                  key={row.saved.paper_id}
+                  className="grid grid-cols-[auto_1fr] gap-0"
+                >
+                  <label className="flex items-start pt-5 pl-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(row.saved.paper_id)}
+                      onChange={() => toggleSelected(row.saved.paper_id)}
+                      className="h-4 w-4 cursor-pointer accent-current"
+                      aria-label={`Select ${row.paper.paper.title}`}
+                    />
+                  </label>
+                  <div>
+                    <PaperRow scored={row.paper} rank={i + 1} />
+                    <LibraryEntryControls item={row.saved} />
+                    <div className="ml-12 mb-3 text-[11px] text-muted-foreground">
+                      Saved by <strong>{row.saved.added_by}</strong> ·{" "}
+                      {new Date(row.saved.added_at).toLocaleString()}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </>

@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { toBibtex } from "@/lib/bibtex";
+import { loadCollab } from "@/lib/collab";
 import { toCsv } from "@/lib/csv";
 import { loadCustomCorpus, statusOf } from "@/lib/custom_corpus";
 import { loadSeedPipeline } from "@/lib/seed";
@@ -26,6 +27,7 @@ interface LibraryItem {
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const format = (url.searchParams.get("format") ?? "bibtex").toLowerCase();
+  const includeNotes = url.searchParams.get("include_notes") === "1";
 
   const items = await readState<LibraryItem[]>("library", []);
   const result = loadSeedPipeline();
@@ -41,6 +43,27 @@ export async function GET(req: Request) {
   const papers = items
     .map((i) => byId.get(i.paper_id))
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
+
+  // Build annote = { ... } content from team notes when requested.
+  // Each note becomes one paragraph in the format
+  //   "<author> (<date>): <body>"
+  let annotations: Record<string, string> | undefined;
+  if (includeNotes && format === "bibtex") {
+    const { notes } = await loadCollab();
+    annotations = {};
+    for (const p of papers) {
+      const list = notes[p.id] ?? [];
+      if (list.length === 0) continue;
+      annotations[p.id] = list
+        .slice()
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .map(
+          (n) =>
+            `${n.author} (${new Date(n.created_at).toISOString().slice(0, 10)}): ${n.body.replace(/\s+/g, " ").trim()}`,
+        )
+        .join("\n\n");
+    }
+  }
 
   if (format === "json") {
     return NextResponse.json({
@@ -97,13 +120,16 @@ export async function GET(req: Request) {
     );
   }
 
-  const header = `% ECCG team library — ${papers.length} papers, generated ${new Date().toISOString()}\n% https://eccg-research-agent.vercel.app/library\n\n`;
-  const body = toBibtex(papers);
+  const noteCount = annotations ? Object.keys(annotations).length : 0;
+  const annoteSuffix = includeNotes ? ` · ${noteCount} annotated` : "";
+  const header = `% ECCG team library — ${papers.length} papers${annoteSuffix}, generated ${new Date().toISOString()}\n% https://eccg-research-agent.vercel.app/library\n\n`;
+  const body = toBibtex(papers, annotations ? { annotations } : undefined);
+  const filenameSuffix = includeNotes ? "-annotated" : "";
   return new NextResponse(header + body, {
     status: 200,
     headers: {
       "content-type": "application/x-bibtex; charset=utf-8",
-      "content-disposition": `attachment; filename="eccg-library-${new Date().toISOString().slice(0, 10)}.bib"`,
+      "content-disposition": `attachment; filename="eccg-library${filenameSuffix}-${new Date().toISOString().slice(0, 10)}.bib"`,
     },
   });
 }
