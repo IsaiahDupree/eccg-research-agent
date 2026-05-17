@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, GitBranch, Users } from "lucide-react";
@@ -28,6 +29,32 @@ export async function generateStaticParams() {
   return Array.from(counts.entries())
     .filter(([, c]) => c >= 5)
     .map(([name]) => ({ name }));
+}
+
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { name } = await params;
+  const decoded = decodeURIComponent(name);
+  const result = loadSeedPipeline();
+  const target = decoded.toLowerCase();
+  const papers = result.scored.filter((s) =>
+    s.paper.authors.some((a) => a.name.toLowerCase() === target),
+  );
+  if (papers.length === 0) return { title: `${decoded} — author not in corpus` };
+  const totalCit = papers.reduce((s, p) => s + p.paper.citation_count, 0);
+  const venues = Array.from(
+    new Set(papers.map((p) => p.paper.venue?.name).filter(Boolean)),
+  ).slice(0, 3);
+  const description = `${decoded} — ${papers.length} papers in the ECCG corpus, ${totalCit.toLocaleString()} total citations. Active in ${venues.join(", ")}.`;
+  return {
+    title: decoded,
+    description,
+    openGraph: {
+      type: "profile",
+      title: `${decoded} — ECCG corpus`,
+      description,
+    },
+    alternates: { canonical: `/author/${encodeURIComponent(decoded)}` },
+  };
 }
 
 export default async function AuthorPage({ params }: Params) {

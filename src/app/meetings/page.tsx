@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Calendar, Mic, FileText, Cloud, ExternalLink } from "lucide-react";
 import { loadSeedMeetings } from "@/lib/seed_meetings";
@@ -7,6 +8,16 @@ import {
   listEccgRecordings,
   ECCG_RECORDINGS_FOLDER_ID,
 } from "@/lib/sources/drive";
+
+export const metadata: Metadata = {
+  title: "ECCG meetings",
+  description:
+    "Transcripts and digests of recurring Event Camera Community Group meetings, with extracted paper mentions linked back to the corpus.",
+  alternates: { canonical: "/meetings" },
+  openGraph: {
+    title: "ECCG meetings — transcripts + paper mentions",
+  },
+};
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60;

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, FileQuestion, Search, ShieldCheck } from "lucide-react";
@@ -25,6 +26,23 @@ export function generateStaticParams() {
 
 interface Params {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { slug } = await params;
+  const niche = findNiche(slug);
+  if (niche.slug !== slug) return { title: "Niche not found" };
+  return {
+    title: niche.label,
+    description: `${niche.label} — ${niche.description}`,
+    keywords: niche.core_keywords,
+    openGraph: {
+      type: "website",
+      title: `${niche.label} — ECCG Research Agent`,
+      description: niche.description,
+    },
+    alternates: { canonical: `/n/${niche.slug}` },
+  };
 }
 
 export default async function NichePage({ params }: Params) {

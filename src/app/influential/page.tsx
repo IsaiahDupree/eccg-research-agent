@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Award, Sparkles } from "lucide-react";
 import { Badge } from "@/components/Badge";
@@ -7,6 +8,17 @@ import { getIntentCounts } from "@/lib/citations";
 import { categoryLabel, formatMonthsAgo } from "@/lib/utils";
 
 export const dynamic = "force-static";
+
+export const metadata: Metadata = {
+  title: "Most-influential papers",
+  description:
+    "Event-camera papers ranked by replication-strength citations: how many other corpus papers built on their methodology, results, or extensions.",
+  alternates: { canonical: "/influential" },
+  openGraph: {
+    title: "Most-influential event-camera papers",
+    description: "Ranked by replication-strength citations — papers others build on.",
+  },
+};
 
 interface Row {
   scored: ReturnType<typeof loadSeedPipeline>["scored"][number];

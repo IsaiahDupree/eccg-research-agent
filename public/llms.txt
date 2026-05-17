@@ -1,0 +1,71 @@
+# ECCG Research Agent
+
+> A continuously-updated research aggregator for the Event Camera Community
+> Group (ECCG). Tracks 1,300+ event-based-vision and neuromorphic-compute
+> papers from arXiv + Semantic Scholar, scored by a transparent 9-axis
+> rubric and ranked by replication-strength citations + community votes.
+
+## Audience
+
+Researchers and engineers working on event cameras (DVS, DAVIS, Prophesee,
+spike cameras), event-based vision (SLAM, optical flow, depth, object
+detection, segmentation), and neuromorphic computing (SNNs, Loihi,
+TrueNorth, SpiNNaker, memristors).
+
+## Primary entry points
+
+- Top-ranked papers: https://eccg-research-agent.vercel.app/
+- Community leaderboard: https://eccg-research-agent.vercel.app/leaderboard
+- Most-influential papers (replication-weighted): https://eccg-research-agent.vercel.app/influential
+- Recent additions: https://eccg-research-agent.vercel.app/whats-new
+- Coverage gaps (papers cited by the corpus but not indexed): https://eccg-research-agent.vercel.app/gaps
+- Per-niche home pages: https://eccg-research-agent.vercel.app/n/event_camera, /n/neuromorphic_compute, /n/spike_camera
+- Browse by taxonomy: https://eccg-research-agent.vercel.app/categories
+- Browse by institution: https://eccg-research-agent.vercel.app/institutions
+- Browse by author: https://eccg-research-agent.vercel.app/author/{name}
+- Browse by paper: https://eccg-research-agent.vercel.app/paper/{arxiv-id}
+- Recurring community meetings (with transcripts + paper mentions): https://eccg-research-agent.vercel.app/meetings
+- Search: https://eccg-research-agent.vercel.app/search?q=
+
+## Machine-readable surfaces
+
+- Sitemap (full URL list): https://eccg-research-agent.vercel.app/sitemap.xml
+- RSS feed (top papers): https://eccg-research-agent.vercel.app/feed.xml
+- Library export (JSON): https://eccg-research-agent.vercel.app/api/library/export?format=json
+- Library export (CSV): https://eccg-research-agent.vercel.app/api/library/export?format=csv
+- Library export (BibTeX): https://eccg-research-agent.vercel.app/api/library/export?format=bibtex
+- Annotated BibTeX (with team notes): https://eccg-research-agent.vercel.app/api/library/export?format=bibtex&include_notes=1
+- Health status: https://eccg-research-agent.vercel.app/api/health
+
+## How papers are scored
+
+Each paper gets a transparent 0-100 score weighted across nine axes:
+ECCG relevance, citation velocity, in-corpus citation graph,
+community votes, code availability, novelty (semantic-embedding-based),
+venue prestige, author signal (h-index), recency. The rubric weights are
+team-configurable at /settings.
+
+The leaderboard's "influence" mode additionally weights citations by their
+S2 intent (methodology / result / extension count more than background)
+and doubles the weight of votes from editors on the EDITORS_EMAILS
+allowlist.
+
+## Citation conventions
+
+If quoting a paper from this site, please cite the paper itself (use the
+BibTeX entry or the arXiv id shown on each /paper/{id} page), not this
+aggregator. This site is a discovery + ranking tool, not a source of
+record.
+
+## License + attribution
+
+Site code: MIT (see GitHub link in the footer).
+Paper metadata: pulled from arXiv (CC-0 / arxiv non-exclusive license)
+and Semantic Scholar (S2 API terms — non-commercial research use).
+Team notes / votes / library: shared Drive state, not licensed for
+external use.
+
+## Contact
+
+Source: https://github.com/IsaiahDupree/eccg-research-agent
+Maintainer: Isaiah Dupree, isaiahdupree33@gmail.com

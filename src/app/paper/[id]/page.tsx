@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, FileText, GitCompareArrows, Github } from "lucide-react";
@@ -27,6 +28,50 @@ export async function generateStaticParams() {
 
 interface Params {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { id } = await params;
+  const decoded = decodeURIComponent(id);
+  const result = loadSeedPipeline();
+  const scored = result.scored.find((s) => s.paper.id === decoded);
+  if (!scored) return { title: "Paper not found" };
+  const p = scored.paper;
+  const authors = p.authors.slice(0, 4).map((a) => a.name).join(", ");
+  const more = p.authors.length > 4 ? ` +${p.authors.length - 4}` : "";
+  const year = new Date(p.published_at).getFullYear();
+  const description =
+    `${authors}${more} · ${p.venue?.name ?? "arXiv preprint"} · ${year} · ${p.citation_count} citations. ` +
+    (p.abstract ? p.abstract.replace(/\s+/g, " ").slice(0, 200) : "");
+  return {
+    title: p.title,
+    description,
+    keywords: [
+      ...(p.eccg_category ? [p.eccg_category] : []),
+      ...(p.categories ?? []),
+      ...p.authors.slice(0, 3).map((a) => a.name),
+      "event camera",
+    ],
+    openGraph: {
+      type: "article",
+      title: p.title,
+      description,
+      publishedTime: p.published_at,
+      authors: p.authors.map((a) => a.name),
+      tags: [
+        ...(p.eccg_category ? [p.eccg_category] : []),
+        ...(p.categories ?? []),
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: p.title,
+      description: description.slice(0, 200),
+    },
+    alternates: {
+      canonical: `/paper/${encodeURIComponent(p.id)}`,
+    },
+  };
 }
 
 export default async function PaperPage({ params }: Params) {
@@ -88,8 +133,75 @@ export default async function PaperPage({ params }: Params) {
       return b.s.total - a.s.total;
     });
 
+  const SITE_URL =
+    process.env.SITE_URL?.trim() || "https://eccg-research-agent.vercel.app";
+
+  // Schema.org ScholarlyArticle markup. Picked up by Google Scholar,
+  // SERP rich-result builders, and any LLM crawler that knows JSON-LD —
+  // gives them the canonical machine-readable view of this page.
+  const sameAs: string[] = [];
+  if (scored.paper.html_url) sameAs.push(scored.paper.html_url);
+  if (scored.paper.doi) sameAs.push(`https://doi.org/${scored.paper.doi}`);
+  if (scored.paper.arxiv_id)
+    sameAs.push(`https://arxiv.org/abs/${scored.paper.arxiv_id}`);
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ScholarlyArticle",
+    "@id": `${SITE_URL}/paper/${encodeURIComponent(scored.paper.id)}`,
+    headline: scored.paper.title,
+    name: scored.paper.title,
+    abstract: scored.paper.abstract,
+    author: scored.paper.authors.map((a) => ({
+      "@type": "Person",
+      name: a.name,
+      url: `${SITE_URL}/author/${encodeURIComponent(a.name)}`,
+    })),
+    datePublished: scored.paper.published_at,
+    isPartOf: scored.paper.venue?.name
+      ? { "@type": "Periodical", name: scored.paper.venue.name }
+      : undefined,
+    keywords: [
+      ...(scored.paper.eccg_category ? [scored.paper.eccg_category] : []),
+      ...(scored.paper.categories ?? []),
+    ].join(", "),
+    citation: cites.slice(0, 25).map((c) => ({
+      "@type": "ScholarlyArticle",
+      "@id": `${SITE_URL}/paper/${encodeURIComponent(c.s.paper.id)}`,
+      name: c.s.paper.title,
+    })),
+    interactionStatistic: {
+      "@type": "InteractionCounter",
+      interactionType: "https://schema.org/CommentAction",
+      userInteractionCount: scored.paper.citation_count,
+      name: "Citations",
+    },
+    url: `${SITE_URL}/paper/${encodeURIComponent(scored.paper.id)}`,
+    sameAs: sameAs.length > 0 ? sameAs : undefined,
+    identifier: [
+      scored.paper.doi
+        ? { "@type": "PropertyValue", propertyID: "doi", value: scored.paper.doi }
+        : null,
+      scored.paper.arxiv_id
+        ? {
+            "@type": "PropertyValue",
+            propertyID: "arxiv",
+            value: scored.paper.arxiv_id,
+          }
+        : null,
+    ].filter(Boolean),
+    publisher: {
+      "@type": "Organization",
+      name: "ECCG Research Agent",
+      url: SITE_URL,
+    },
+  };
+
   return (
     <article className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="min-w-0">
         <Link
           href="/"

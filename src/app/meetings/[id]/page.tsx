@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { loadSeedMeetings } from "@/lib/seed_meetings";
@@ -13,6 +14,28 @@ export async function generateStaticParams() {
 
 interface Params {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { id } = await params;
+  const m = loadSeedMeetings().find((mm) => mm.id === id);
+  if (!m) return { title: "Meeting not found" };
+  const date = new Date(m.held_at).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const attendeeNames = m.attendees.slice(0, 3).map((a) => a.name).join(", ");
+  return {
+    title: m.title,
+    description: `${m.title} — ECCG meeting on ${date}. Attendees: ${attendeeNames}${m.attendees.length > 3 ? ` +${m.attendees.length - 3}` : ""}.`,
+    openGraph: {
+      type: "article",
+      title: `${m.title} — ECCG meeting`,
+      publishedTime: m.held_at,
+    },
+    alternates: { canonical: `/meetings/${id}` },
+  };
 }
 
 function formatDate(iso: string): string {

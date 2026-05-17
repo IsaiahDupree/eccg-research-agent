@@ -8,18 +8,56 @@ import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { NicheChip } from "@/components/NicheChip";
 import "./globals.css";
 
+const SITE_URL =
+  process.env.SITE_URL?.trim() || "https://eccg-research-agent.vercel.app";
+
 export const metadata: Metadata = {
-  title: "ECCG Research Agent",
+  title: {
+    default: "ECCG Research Agent — Event-camera papers, ranked",
+    template: "%s · ECCG Research Agent",
+  },
   description:
-    "A research aggregator for the Event Camera Community Group. Papers, code, and citations from arXiv, Semantic Scholar, and GitHub — ranked and digested.",
-  metadataBase: new URL("https://eccg-research-agent.vercel.app"),
+    "A continuously-updated digest of event-based-vision and neuromorphic-compute research. 1,300+ papers from arXiv + Semantic Scholar, ranked on a transparent 9-axis rubric and replication-strength citations.",
+  metadataBase: new URL(SITE_URL),
+  keywords: [
+    "event camera",
+    "event-based vision",
+    "neuromorphic",
+    "DVS",
+    "DAVIS",
+    "SNN",
+    "spiking neural network",
+    "research aggregator",
+    "ECCG",
+    "Event Camera Community Group",
+    "Prophesee",
+    "spike camera",
+  ],
+  authors: [{ name: "Isaiah Dupree", url: "https://github.com/IsaiahDupree" }],
+  openGraph: {
+    type: "website",
+    siteName: "ECCG Research Agent",
+    title: "ECCG Research Agent — Event-camera papers, ranked",
+    description:
+      "1,300+ event-based-vision papers from arXiv + S2, ranked on replication strength + community votes. Updated daily.",
+    url: SITE_URL,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ECCG Research Agent",
+    description:
+      "Event-camera + neuromorphic research, ranked. 1,300+ papers, citation-graph + community-vote weighted.",
+  },
   alternates: {
+    canonical: SITE_URL,
     types: {
       "application/rss+xml": [
         { url: "/feed.xml", title: "ECCG Research — Top papers" },
       ],
     },
   },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

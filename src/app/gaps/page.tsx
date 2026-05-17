@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink, Search } from "lucide-react";
 import gapsRaw from "@/fixtures/eccg_gaps.json" with { type: "json" };
+
+export const metadata: Metadata = {
+  title: "Coverage gaps",
+  description:
+    "Papers our top-200 corpus references that aren't yet indexed — foundational reading the ECCG community is missing, ranked by inbound-citation frequency.",
+  alternates: { canonical: "/gaps" },
+  openGraph: {
+    title: "Coverage gaps — ECCG Research Agent",
+    description: "Papers the corpus cites but doesn't yet include.",
+  },
+};
 import { Badge } from "@/components/Badge";
 import IngestButton from "./IngestButton";
 
