@@ -10,6 +10,7 @@ import { getNeighbors } from "@/lib/similarity";
 import { NotesPanel } from "@/components/NotesPanel";
 import { VoteWidget } from "@/components/VoteWidget";
 import { CompareWithLibraryButton } from "@/components/CompareWithLibraryButton";
+import { VoteReasonsPanel } from "@/components/VoteReasonsPanel";
 import { getCitationEdges, getIntentCounts } from "@/lib/citations";
 import { getMeetingMentionsFor } from "@/lib/meeting_mentions";
 import { Mic } from "lucide-react";
@@ -342,6 +343,8 @@ export default async function PaperPage({ params }: Params) {
             </section>
           );
         })()}
+
+        <VoteReasonsPanel paperId={scored.paper.id} />
 
         <NotesPanel paperId={scored.paper.id} />
 

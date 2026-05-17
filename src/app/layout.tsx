@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { HeaderNav } from "@/components/HeaderNav";
 import { HeaderSearch } from "@/components/HeaderSearch";
 import { IdentityChip } from "@/components/IdentityChip";
+import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { NicheChip } from "@/components/NicheChip";
 import "./globals.css";
 
@@ -69,6 +70,7 @@ export default function RootLayout({
         <main id="main" className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
           {children}
         </main>
+        <KeyboardShortcuts />
         <footer className="mx-auto max-w-7xl px-4 py-10 text-xs text-muted-foreground sm:px-6">
           <div className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-baseline sm:justify-between">
             <p className="max-w-3xl">
