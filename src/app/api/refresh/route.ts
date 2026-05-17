@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { assignRelevance } from "@/lib/analysis/relevance";
+import { embedPapersIncremental, hasOpenAi } from "@/lib/embeddings";
 import { readState, writeState } from "@/lib/google/state";
 import { NICHES, findNiche, type NicheConfig } from "@/lib/niches";
 import { sendTelegram, isTelegramConfigured, htmlEscape, tgLink } from "@/lib/notify";
@@ -132,6 +133,26 @@ export async function GET(req: Request) {
       await writeState(CUSTOM_CORPUS_STATE, [...allAdditions, ...existing]);
     }
 
+    // Best-effort: embed the new papers so the offline rebuild can pick them
+    // up next pass. Skipped silently when OPENAI_API_KEY is missing — never
+    // blocks the cron's primary purpose (writing new papers to Drive).
+    let embedReport: { embedded: number; skipped: number; failed: number } | null = null;
+    if (allAdditions.length > 0 && hasOpenAi()) {
+      try {
+        const r = await embedPapersIncremental(
+          allAdditions.map((a) => a.paper),
+          allAdditions.length,
+        );
+        embedReport = {
+          embedded: r.embedded.length,
+          skipped: r.skipped.length,
+          failed: r.failed.length,
+        };
+      } catch (err) {
+        console.warn("incremental embed failed:", err);
+      }
+    }
+
     let telegram: { ok: boolean; error?: string } | null = null;
     const minToNotify = Number(process.env.REFRESH_NOTIFY_MIN ?? "1");
     if (allAdditions.length >= minToNotify && isTelegramConfigured()) {
@@ -161,6 +182,7 @@ export async function GET(req: Request) {
       refreshed_at: now,
       niches: reports,
       added: allAdditions.length,
+      embed: embedReport,
       telegram,
       newest: allAdditions.slice(0, 5).map((a) => ({
         id: a.paper.id,

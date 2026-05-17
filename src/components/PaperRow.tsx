@@ -14,9 +14,26 @@ interface PaperRowProps {
   displayScore?: number;
   /** Optional sub-label shown under the score bar (e.g. "hot 1.7"). */
   scoreSubLabel?: string;
+  /** Search query — when set, matching substrings in title are wrapped in <mark>. */
+  highlight?: string;
 }
 
-export function PaperRow({ scored, rank, displayScore, scoreSubLabel }: PaperRowProps) {
+function highlightText(text: string, q: string): React.ReactNode {
+  if (!q) return text;
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="rounded bg-amber-200/70 px-0.5 text-foreground dark:bg-amber-800/60">
+        {text.slice(idx, idx + q.length)}
+      </mark>
+      {text.slice(idx + q.length)}
+    </>
+  );
+}
+
+export function PaperRow({ scored, rank, displayScore, scoreSubLabel, highlight }: PaperRowProps) {
   const { paper, total, repo } = scored;
   const detailHref = `/paper/${encodeURIComponent(paper.id)}`;
   const score = displayScore ?? total;
@@ -31,7 +48,7 @@ export function PaperRow({ scored, rank, displayScore, scoreSubLabel }: PaperRow
           href={detailHref}
           className="text-base font-medium leading-snug group-hover:underline"
         >
-          {paper.title}
+          {highlight ? highlightText(paper.title, highlight) : paper.title}
         </Link>
         <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
           {paper.abstract}

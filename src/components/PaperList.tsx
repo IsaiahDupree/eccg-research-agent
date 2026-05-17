@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Flame, Sparkles, Trophy } from "lucide-react";
 import { FilterBar } from "./FilterBar";
@@ -57,6 +57,23 @@ export function PaperList({ scored }: PaperListProps) {
     setSort(parseSortParam(params.get("sort")));
     setPage(0);
   }, [params]);
+
+  // Debounced sync of the live query into the URL so search results are
+  // shareable. We don't push() — replaceState avoids cluttering history.
+  const initialQueryRef = useRef(params.get("q") ?? "");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Skip the very first effect run (when query was just hydrated from the URL).
+    if (query === initialQueryRef.current) return;
+    const t = setTimeout(() => {
+      const url = new URL(window.location.href);
+      if (query) url.searchParams.set("q", query);
+      else url.searchParams.delete("q");
+      window.history.replaceState(null, "", url.toString());
+      initialQueryRef.current = query;
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const merged = useMemo(() => {
     const knownIds = new Set(scored.map((s) => s.paper.id));
@@ -200,6 +217,7 @@ export function PaperList({ scored }: PaperListProps) {
               scored={d.scored}
               rank={pageStart + i + 1}
               displayScore={sort === "top" ? d.adjusted : d.scored.total}
+              highlight={query.trim()}
               scoreSubLabel={
                 sort === "hot"
                   ? `hot ${d.hot.toFixed(2)} · net ${d.net >= 0 ? "+" : ""}${d.net}`

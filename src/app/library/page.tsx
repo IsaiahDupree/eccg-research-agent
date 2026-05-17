@@ -7,6 +7,7 @@ import { loadSeedPipelineClient } from "@/lib/seed_client";
 import { useLibrary, clearLibraryCache } from "@/lib/library_client";
 import { useVotes } from "@/lib/votes_client";
 import { PaperRow } from "@/components/PaperRow";
+import { toBibtex } from "@/lib/bibtex";
 import { categoryLabel, formatMonthsAgo } from "@/lib/utils";
 import type { ScoredPaper } from "@/lib/models";
 
@@ -27,18 +28,9 @@ export default function LibraryPage() {
   const missing = sortedItems.length - visible.length;
 
   function exportBibtex() {
-    const lines = visible.map(({ paper: s }) => {
-      const p = s.paper;
-      const key = (p.arxiv_id || p.id).replace(/\W+/g, "");
-      const authors = p.authors.map((a) => a.name).join(" and ");
-      const year = new Date(p.published_at).getFullYear();
-      return `@article{${key},\n  title = {${p.title}},\n  author = {${authors}},\n  year = {${year}},\n  journal = {${
-        p.venue?.name ?? "arXiv preprint"
-      }},${p.arxiv_id ? `\n  eprint = {${p.arxiv_id}},\n  archivePrefix = {arXiv},` : ""}${
-        p.html_url ? `\n  url = {${p.html_url}},` : ""
-      }\n}`;
-    });
-    const blob = new Blob([lines.join("\n\n")], { type: "text/x-bibtex" });
+    const papers = visible.map(({ paper: s }) => s.paper);
+    const header = `% ECCG team library — ${papers.length} papers, generated ${new Date().toISOString()}\n% https://eccg-research-agent.vercel.app/library\n\n`;
+    const blob = new Blob([header + toBibtex(papers)], { type: "application/x-bibtex" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `eccg-library-${new Date().toISOString().slice(0, 10)}.bib`;

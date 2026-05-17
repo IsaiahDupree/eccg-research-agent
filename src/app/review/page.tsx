@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/Badge";
 import { getIdentity } from "@/lib/identity";
+import { NICHES } from "@/lib/niches";
 import { categoryLabel, cn } from "@/lib/utils";
 import { getEditorsState } from "@/lib/rubric_client";
 
@@ -44,6 +45,12 @@ interface ReviewResponse {
   records: UploadedRecord[];
 }
 
+function nicheOfRecord(r: UploadedRecord): string {
+  // uploaded_by="cron:<niche>" for cron-discovered papers; spreadsheet/user
+  // uploads default to event_camera (the founding niche).
+  return r.uploaded_by.startsWith("cron:") ? r.uploaded_by.slice(5) : "event_camera";
+}
+
 export default function ReviewPage() {
   const [data, setData] = useState<ReviewResponse | null>(null);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
@@ -57,6 +64,7 @@ export default function ReviewPage() {
     editors: [],
   });
   const [error, setError] = useState<string | null>(null);
+  const [nicheFilter, setNicheFilter] = useState<string>("all");
 
   const refresh = useCallback(async () => {
     const r = await fetch("/api/corpus/custom?status=pending", { cache: "no-store" });
@@ -65,6 +73,10 @@ export default function ReviewPage() {
 
   useEffect(() => {
     setMe(getIdentity().alias);
+    if (typeof window !== "undefined") {
+      const q = new URL(window.location.href).searchParams.get("niche");
+      if (q) setNicheFilter(q);
+    }
     fetch("/api/rubric")
       .then((r) => r.json())
       .then((j) => {
@@ -80,16 +92,42 @@ export default function ReviewPage() {
   const isReadOnly =
     editors.enforced && !editors.editors.some((e) => e.toLowerCase() === me.toLowerCase());
 
+  const filteredRecords = useMemo(() => {
+    const recs = data?.records ?? [];
+    if (nicheFilter === "all") return recs;
+    return recs.filter((r) => nicheOfRecord(r) === nicheFilter);
+  }, [data, nicheFilter]);
+
+  const nicheCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of data?.records ?? []) {
+      const tag = nicheOfRecord(r);
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+    return counts;
+  }, [data]);
+
   // Group records by ECCG category for the "approve all in <category>" UI.
   const byCategory = useMemo(() => {
     const m = new Map<string, UploadedRecord[]>();
-    for (const r of data?.records ?? []) {
+    for (const r of filteredRecords) {
       const cat = r.paper.eccg_category ?? "unclassified";
       if (!m.has(cat)) m.set(cat, []);
       m.get(cat)!.push(r);
     }
     return Array.from(m.entries()).sort((a, b) => b[1].length - a[1].length);
-  }, [data]);
+  }, [filteredRecords]);
+
+  function setNicheFilterAndUrl(slug: string) {
+    setNicheFilter(slug);
+    setSelected(new Set());
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (slug === "all") url.searchParams.delete("niche");
+      else url.searchParams.set("niche", slug);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }
 
   async function act(paper_id: string, action: "approve" | "reject") {
     if (isReadOnly) {
@@ -184,8 +222,8 @@ export default function ReviewPage() {
     });
   }
 
-  function selectAll() {
-    setSelected(new Set(data?.records.map((r) => r.paper.id) ?? []));
+  function selectAllVisible() {
+    setSelected(new Set(filteredRecords.map((r) => r.paper.id)));
   }
   function clearSelection() {
     setSelected(new Set());
@@ -225,13 +263,48 @@ export default function ReviewPage() {
         )}
       </section>
 
+      {data && data.records.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1 text-xs">
+          <span className="mr-1 text-muted-foreground">Niche:</span>
+          {[
+            { slug: "all", label: "All", count: data.records.length },
+            ...NICHES.map((n) => ({
+              slug: n.slug,
+              label: n.label,
+              count: nicheCounts.get(n.slug) ?? 0,
+            })),
+          ].map(({ slug, label, count }) => (
+            <button
+              key={slug}
+              type="button"
+              onClick={() => setNicheFilterAndUrl(slug)}
+              aria-pressed={nicheFilter === slug}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5",
+                nicheFilter === slug
+                  ? "border-accent bg-accent text-accent-foreground"
+                  : "hover:bg-muted",
+                slug !== "all" && count === 0 && "opacity-40",
+              )}
+            >
+              {label}
+              <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">
+                {count}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {!data ? (
         <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading review queue from Drive…
         </div>
-      ) : data.records.length === 0 ? (
+      ) : filteredRecords.length === 0 ? (
         <div className="rounded-lg border bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground">
-          Queue is empty. New cron-picked papers will land here daily.
+          {nicheFilter === "all"
+            ? "Queue is empty. New cron-picked papers will land here daily."
+            : `No pending papers in ${nicheFilter}. Clear the niche filter to see the full queue.`}
         </div>
       ) : (
         <>
@@ -267,13 +340,13 @@ export default function ReviewPage() {
           <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
             <button
               type="button"
-              onClick={selected.size === data.records.length ? clearSelection : selectAll}
+              onClick={selected.size === filteredRecords.length ? clearSelection : selectAllVisible}
               className="rounded-md border px-2.5 py-1 hover:bg-muted"
             >
-              {selected.size === data.records.length ? "Clear selection" : "Select all"}
+              {selected.size === filteredRecords.length ? "Clear selection" : "Select all visible"}
             </button>
             <span className="text-muted-foreground">
-              {selected.size} of {data.records.length} selected
+              {selected.size} of {filteredRecords.length} selected
             </span>
             <span className="ml-auto flex flex-wrap gap-2">
               <button
@@ -306,7 +379,7 @@ export default function ReviewPage() {
           </div>
 
           <ul className="space-y-3">
-            {data.records.map((r) => {
+            {filteredRecords.map((r) => {
               const isExpanded = expanded.has(r.paper.id);
               const dig = digests[r.paper.id];
               return (
