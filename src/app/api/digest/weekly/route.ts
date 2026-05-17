@@ -1,0 +1,228 @@
+/**
+ * GET /api/digest/weekly  — markdown digest of last N days of activity.
+ *                          ?format=json returns structured payload.
+ *                          ?days=N controls window (default 7).
+ *                          ?notify=1 also fires the Telegram message.
+ *
+ * Cron: vercel.json Mondays 14:00 UTC posts ?notify=1.
+ */
+
+import { NextResponse } from "next/server";
+import { loadCollab } from "@/lib/collab";
+import { readState } from "@/lib/google/state";
+import { sendTelegram, isTelegramConfigured, htmlEscape, tgLink } from "@/lib/notify";
+import type { Paper } from "@/lib/models";
+
+const STATE_NAME = "custom-corpus";
+const SITE_URL = process.env.SITE_URL ?? "https://eccg-research-agent.vercel.app";
+
+interface UploadedRecord {
+  paper: Paper;
+  score_base: number;
+  uploaded_by: string;
+  uploaded_at: string;
+  source_file: string;
+}
+
+interface DigestPayload {
+  generated_at: string;
+  window_days: number;
+  cutoff: string;
+  new_papers: { id: string; title: string; uploaded_at: string; uploaded_by: string; category?: string; html_url?: string }[];
+  new_library: { paper_id: string; added_by: string; added_at: string }[];
+  new_notes: { paper_id: string; author: string; created_at: string; body: string }[];
+  top_voted: { paper_id: string; up: number; down: number; net: number }[];
+}
+
+function isoCutoff(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function payloadToMarkdown(p: DigestPayload): string {
+  const date = new Date(p.generated_at).toISOString().slice(0, 10);
+  const lines: string[] = [];
+  lines.push(`# ECCG Weekly Digest — ${date}`);
+  lines.push("");
+  lines.push(`*Activity over the last ${p.window_days} day${p.window_days === 1 ? "" : "s"}.*`);
+  lines.push("");
+
+  lines.push(
+    `**At a glance:** ${p.new_papers.length} new papers · ${p.new_library.length} library additions · ${p.new_notes.length} notes · ${p.top_voted.length} papers voted on this week.`,
+  );
+  lines.push("");
+
+  if (p.new_papers.length > 0) {
+    lines.push(`## New papers (${p.new_papers.length})`);
+    lines.push("");
+    for (const np of p.new_papers.slice(0, 25)) {
+      const url = np.html_url || `${SITE_URL}/paper/${encodeURIComponent(np.id)}`;
+      lines.push(
+        `- [${np.title}](${url})${np.category ? `  _(${np.category})_` : ""}  — ingested by **${np.uploaded_by}** on ${new Date(np.uploaded_at).toLocaleDateString()}`,
+      );
+    }
+    if (p.new_papers.length > 25) lines.push(`- _…and ${p.new_papers.length - 25} more_`);
+    lines.push("");
+  }
+
+  if (p.top_voted.length > 0) {
+    lines.push(`## Most voted this week`);
+    lines.push("");
+    for (const v of p.top_voted.slice(0, 10)) {
+      lines.push(
+        `- [${v.paper_id}](${SITE_URL}/paper/${encodeURIComponent(v.paper_id)}) — ↑${v.up} / ↓${v.down} (net ${v.net >= 0 ? "+" : ""}${v.net})`,
+      );
+    }
+    lines.push("");
+  }
+
+  if (p.new_library.length > 0) {
+    lines.push(`## Library activity (${p.new_library.length})`);
+    lines.push("");
+    for (const l of p.new_library.slice(0, 15)) {
+      lines.push(
+        `- **${l.added_by}** saved [${l.paper_id}](${SITE_URL}/paper/${encodeURIComponent(l.paper_id)}) on ${new Date(l.added_at).toLocaleDateString()}`,
+      );
+    }
+    lines.push("");
+  }
+
+  if (p.new_notes.length > 0) {
+    lines.push(`## Notes (${p.new_notes.length})`);
+    lines.push("");
+    for (const n of p.new_notes.slice(0, 15)) {
+      lines.push(
+        `- _${n.author}_ on [${n.paper_id}](${SITE_URL}/paper/${encodeURIComponent(n.paper_id)}): ${n.body.replace(/\n+/g, " ").slice(0, 200)}${n.body.length > 200 ? "…" : ""}`,
+      );
+    }
+    lines.push("");
+  }
+
+  lines.push("---");
+  lines.push(`*Browse: [list](${SITE_URL}/) · [leaderboard](${SITE_URL}/leaderboard) · [whats-new](${SITE_URL}/whats-new) · [RSS](${SITE_URL}/feed.xml)*`);
+  return lines.join("\n");
+}
+
+function payloadToTelegram(p: DigestPayload): string {
+  const date = new Date(p.generated_at).toISOString().slice(0, 10);
+  const lines: string[] = [];
+  lines.push(`<b>ECCG Weekly Digest — ${date}</b>`);
+  lines.push("");
+  lines.push(
+    `${p.new_papers.length} new · ${p.new_library.length} saved · ${p.new_notes.length} notes · ${p.top_voted.length} voted`,
+  );
+  if (p.new_papers.length > 0) {
+    lines.push("");
+    lines.push("<b>Top new papers:</b>");
+    for (const np of p.new_papers.slice(0, 5)) {
+      const url = np.html_url || `${SITE_URL}/paper/${encodeURIComponent(np.id)}`;
+      lines.push(`• ${tgLink(np.title.slice(0, 80), url)}${np.category ? ` <i>(${htmlEscape(np.category)})</i>` : ""}`);
+    }
+  }
+  if (p.top_voted.length > 0) {
+    lines.push("");
+    lines.push("<b>Most voted:</b>");
+    for (const v of p.top_voted.slice(0, 3)) {
+      lines.push(`• <code>${htmlEscape(v.paper_id)}</code> — net ${v.net >= 0 ? "+" : ""}${v.net}`);
+    }
+  }
+  lines.push("");
+  lines.push(`${htmlEscape(SITE_URL)}/whats-new`);
+  return lines.join("\n");
+}
+
+async function buildPayload(days: number): Promise<DigestPayload> {
+  const cutoff = isoCutoff(days);
+  const [uploaded, collab] = await Promise.all([
+    readState<UploadedRecord[]>(STATE_NAME, []),
+    loadCollab(),
+  ]);
+
+  const newPapers = uploaded
+    .filter((u) => u.uploaded_at >= cutoff)
+    .map((u) => ({
+      id: u.paper.id,
+      title: u.paper.title,
+      uploaded_at: u.uploaded_at,
+      uploaded_by: u.uploaded_by,
+      category: u.paper.eccg_category,
+      html_url: u.paper.html_url,
+    }));
+
+  const newLibrary = collab.library
+    .filter((l) => l.added_at >= cutoff)
+    .map((l) => ({ paper_id: l.paper_id, added_by: l.added_by, added_at: l.added_at }));
+
+  const newNotes: DigestPayload["new_notes"] = [];
+  for (const [paperId, notes] of Object.entries(collab.notes)) {
+    for (const n of notes) {
+      if (n.created_at >= cutoff) {
+        newNotes.push({
+          paper_id: paperId,
+          author: n.author,
+          created_at: n.created_at,
+          body: n.body,
+        });
+      }
+    }
+  }
+
+  // "Top voted this week" — votes don't have full per-voter timestamps in the
+  // compact tally, so include any paper whose voter cast inside the window.
+  const topVoted: DigestPayload["top_voted"] = [];
+  for (const [paperId, v] of Object.entries(collab.votes)) {
+    const recentVoter = v.voters?.find((vv) => vv.voted_at >= cutoff);
+    if (recentVoter && (v.upvotes > 0 || v.downvotes > 0)) {
+      topVoted.push({ paper_id: paperId, up: v.upvotes, down: v.downvotes, net: v.net });
+    }
+  }
+  topVoted.sort((a, b) => b.net - a.net);
+
+  return {
+    generated_at: new Date().toISOString(),
+    window_days: days,
+    cutoff,
+    new_papers: newPapers.sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at)),
+    new_library: newLibrary.sort((a, b) => b.added_at.localeCompare(a.added_at)),
+    new_notes: newNotes.sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    top_voted: topVoted,
+  };
+}
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const days = Math.min(60, Math.max(1, Number(url.searchParams.get("days") ?? "7")));
+  const format = url.searchParams.get("format") ?? "markdown";
+  const notify = url.searchParams.get("notify") === "1";
+
+  // Optional shared-secret auth (cron uses this)
+  const expected = process.env.REFRESH_SECRET;
+  if (expected && notify) {
+    const provided = req.headers.get("authorization") ?? url.searchParams.get("token");
+    if (provided !== `Bearer ${expected}` && provided !== expected) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+  }
+
+  const payload = await buildPayload(days);
+  let telegramResult: { ok: boolean; error?: string } | null = null;
+  if (notify && isTelegramConfigured()) {
+    telegramResult = await sendTelegram(payloadToTelegram(payload));
+  }
+
+  if (format === "json") {
+    return NextResponse.json({ ok: true, payload, telegram: telegramResult });
+  }
+  const md = payloadToMarkdown(payload);
+  return new Response(md, {
+    headers: {
+      "content-type": "text/markdown; charset=utf-8",
+      "cache-control": "no-store",
+      ...(telegramResult
+        ? { "x-eccg-telegram": telegramResult.ok ? "sent" : `error: ${telegramResult.error ?? "?"}` }
+        : {}),
+    },
+  });
+}

@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { assignRelevance } from "@/lib/analysis/relevance";
 import { readState, writeState } from "@/lib/google/state";
+import { sendTelegram, isTelegramConfigured, tgEscape } from "@/lib/notify";
 import { fetchArxivPapers } from "@/lib/sources/arxiv";
 import type { Paper } from "@/lib/models";
 import seedJson from "@/fixtures/seed_papers.json" with { type: "json" };
 import eccgCorpus from "@/fixtures/eccg_corpus.json" with { type: "json" };
+
+const SITE_URL = process.env.SITE_URL ?? "https://eccg-research-agent.vercel.app";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 min budget — arXiv batches + retries
@@ -72,11 +75,28 @@ export async function GET(req: Request) {
       await writeState(CUSTOM_CORPUS_STATE, [...additions, ...existing]);
     }
 
+    let telegram: { ok: boolean; error?: string } | null = null;
+    const minToNotify = Number(process.env.REFRESH_NOTIFY_MIN ?? "1");
+    if (additions.length >= minToNotify && isTelegramConfigured()) {
+      const list = additions
+        .slice(0, 5)
+        .map((a, i) => {
+          const url = a.paper.html_url || `${SITE_URL}/paper/${encodeURIComponent(a.paper.id)}`;
+          return `${i + 1}. [${tgEscape(a.paper.title)}](${url})${a.paper.eccg_category ? ` _(${a.paper.eccg_category})_` : ""}`;
+        })
+        .join("\n");
+      const more = additions.length > 5 ? `\n_…and ${additions.length - 5} more_` : "";
+      telegram = await sendTelegram(
+        `*${additions.length} new event-camera paper${additions.length === 1 ? "" : "s"}* on the ECCG agent\n\n${list}${more}\n\n${SITE_URL}/?sort=new`,
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       refreshed_at: new Date().toISOString(),
       fetched: fresh.length,
       added: additions.length,
+      telegram,
       newest: additions.slice(0, 5).map((a) => ({
         id: a.paper.id,
         title: a.paper.title,

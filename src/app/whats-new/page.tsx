@@ -164,15 +164,40 @@ export default function WhatsNewPage() {
     return c;
   }, [past7d]);
 
+  async function downloadWeeklyDigest() {
+    const r = await fetch("/api/digest/weekly?days=7");
+    if (!r.ok) return;
+    const md = await r.text();
+    const blob = new Blob([md], { type: "text/markdown" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `eccg-digest-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   return (
     <>
       <section className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">What&apos;s new</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Activity from the shared Drive store. Subscribe to the{" "}
-          <Link href="/feed.xml" className="underline">RSS feed</Link>{" "}
-          to follow new top-ranked papers in your reader.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">What&apos;s new</h1>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Activity from the shared Drive store. Subscribe to the{" "}
+              <Link href="/feed.xml" className="underline">RSS feed</Link>{" "}
+              to follow new top-ranked papers in your reader.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={downloadWeeklyDigest}
+            disabled={!loaded}
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+            title="Download a markdown weekly digest (last 7 days)"
+          >
+            <Upload className="h-3.5 w-3.5 rotate-180" /> Download digest
+          </button>
+        </div>
         <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Library adds (7d)" value={counts.library} icon={<Bookmark className="h-3.5 w-3.5" />} />
           <Stat label="Votes (7d)" value={counts.vote} icon={<ArrowUp className="h-3.5 w-3.5" />} />
