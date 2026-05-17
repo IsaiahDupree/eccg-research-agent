@@ -1,11 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { Check, FileSpreadsheet, Loader2, Lock, ShieldCheck, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  FileSpreadsheet,
+  Loader2,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/Badge";
 import { getIdentity } from "@/lib/identity";
-import { categoryLabel } from "@/lib/utils";
+import { categoryLabel, cn } from "@/lib/utils";
 import { getEditorsState } from "@/lib/rubric_client";
 
 interface UploadedRecord {
@@ -37,6 +47,10 @@ interface ReviewResponse {
 export default function ReviewPage() {
   const [data, setData] = useState<ReviewResponse | null>(null);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [digests, setDigests] = useState<Record<string, { tldr: string; model: string } | "loading" | "error">>({});
   const [me, setMe] = useState("anonymous");
   const [editors, setEditors] = useState<{ enforced: boolean; editors: string[] }>({
     enforced: false,
@@ -51,7 +65,6 @@ export default function ReviewPage() {
 
   useEffect(() => {
     setMe(getIdentity().alias);
-    // Trigger rubric_client load so editors state is populated
     fetch("/api/rubric")
       .then((r) => r.json())
       .then((j) => {
@@ -66,6 +79,17 @@ export default function ReviewPage() {
 
   const isReadOnly =
     editors.enforced && !editors.editors.some((e) => e.toLowerCase() === me.toLowerCase());
+
+  // Group records by ECCG category for the "approve all in <category>" UI.
+  const byCategory = useMemo(() => {
+    const m = new Map<string, UploadedRecord[]>();
+    for (const r of data?.records ?? []) {
+      const cat = r.paper.eccg_category ?? "unclassified";
+      if (!m.has(cat)) m.set(cat, []);
+      m.get(cat)!.push(r);
+    }
+    return Array.from(m.entries()).sort((a, b) => b[1].length - a[1].length);
+  }, [data]);
 
   async function act(paper_id: string, action: "approve" | "reject") {
     if (isReadOnly) {
@@ -86,8 +110,85 @@ export default function ReviewPage() {
       }
     } finally {
       setBusy((b) => ({ ...b, [paper_id]: false }));
+      setSelected((s) => {
+        const n = new Set(s);
+        n.delete(paper_id);
+        return n;
+      });
     }
     await refresh();
+  }
+
+  async function bulkAct(action: "approve" | "reject", body: object, ctx: string) {
+    if (isReadOnly) {
+      setError("Read-only — your alias is not on the editor allowlist.");
+      return;
+    }
+    setError(null);
+    setBulkBusy(true);
+    try {
+      const r = await fetch("/api/review/bulk", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...body, action, user: me }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(j.error ?? `${ctx} failed (HTTP ${r.status})`);
+      } else {
+        setSelected(new Set());
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+    await refresh();
+  }
+
+  async function loadDigest(paperId: string) {
+    if (digests[paperId]) return;
+    setDigests((d) => ({ ...d, [paperId]: "loading" }));
+    try {
+      const r = await fetch(`/api/digest/${encodeURIComponent(paperId)}`);
+      const j = await r.json();
+      if (j.digest) {
+        setDigests((d) => ({
+          ...d,
+          [paperId]: { tldr: j.digest.tldr ?? "", model: j.digest.model ?? "" },
+        }));
+      } else {
+        setDigests((d) => ({ ...d, [paperId]: "error" }));
+      }
+    } catch {
+      setDigests((d) => ({ ...d, [paperId]: "error" }));
+    }
+  }
+
+  function toggleExpanded(paperId: string) {
+    setExpanded((e) => {
+      const n = new Set(e);
+      if (n.has(paperId)) n.delete(paperId);
+      else {
+        n.add(paperId);
+        loadDigest(paperId);
+      }
+      return n;
+    });
+  }
+
+  function toggleSelected(paperId: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(paperId)) n.delete(paperId);
+      else n.add(paperId);
+      return n;
+    });
+  }
+
+  function selectAll() {
+    setSelected(new Set(data?.records.map((r) => r.paper.id) ?? []));
+  }
+  function clearSelection() {
+    setSelected(new Set());
   }
 
   return (
@@ -97,12 +198,11 @@ export default function ReviewPage() {
           <ShieldCheck className="h-6 w-6" aria-hidden /> Review queue
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Papers the daily arXiv cron has picked up but haven&apos;t been ranked
-          yet. Approve to fold a paper into the public rankings; reject to
-          keep it out of sight (the record stays so the cron won&apos;t
-          re-ingest it). User-uploaded papers via{" "}
+          Papers the daily arXiv cron picked up but haven&apos;t been ranked yet.
+          Use the per-row buttons, or batch-approve everything in a category
+          with one click. User-uploaded papers via{" "}
           <Link href="/upload" className="underline">/upload</Link> bypass the
-          queue because the team explicitly imported them.
+          queue.
         </p>
         {data?.counts && (
           <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -117,7 +217,6 @@ export default function ReviewPage() {
             <span>
               Read-only — only editors{" "}
               <strong>{editors.editors.join(", ")}</strong> can approve or reject.
-              Set your alias to one of these in the header.
             </span>
           </div>
         )}
@@ -135,76 +234,191 @@ export default function ReviewPage() {
           Queue is empty. New cron-picked papers will land here daily.
         </div>
       ) : (
-        <ul className="space-y-3">
-          {data.records.map((r) => (
-            <li
-              key={r.paper.id}
-              className="rounded-lg border bg-card p-4"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <Link
-                    href={`/paper/${encodeURIComponent(r.paper.id)}?include=pending`}
-                    className="line-clamp-2 text-base font-medium hover:underline"
+        <>
+          {/* Per-category quick actions */}
+          {byCategory.length > 1 && (
+            <div className="mb-4 rounded-lg border bg-muted/30 p-3">
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Approve all in a category
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {byCategory.map(([cat, items]) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    disabled={isReadOnly || bulkBusy}
+                    onClick={() =>
+                      bulkAct("approve", { category: cat, status_in: "pending" }, `approve ${cat}`)
+                    }
+                    className="inline-flex items-center gap-1 rounded-full border bg-background px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
                   >
-                    {r.paper.title}
-                  </Link>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {r.paper.authors.slice(0, 3).map((a) => a.name).join(", ")}
-                    {r.paper.authors.length > 3 && ` +${r.paper.authors.length - 3}`}
-                    {" · "}
-                    {r.paper.venue?.name ?? "preprint"}
-                    {" · ingested "}
-                    {new Date(r.uploaded_at).toLocaleDateString()} by{" "}
-                    <strong>{r.uploaded_by}</strong>
-                    {" · "}
-                    <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
-                      <FileSpreadsheet className="h-3 w-3" /> {r.source_file}
+                    <Check className="h-3 w-3 text-emerald-600" />
+                    {categoryLabel(cat)}{" "}
+                    <span className="rounded-full bg-emerald-100 px-1.5 text-[10px] tabular-nums text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                      {items.length}
                     </span>
-                  </div>
-                  {r.paper.eccg_category && (
-                    <Badge variant="outline" className="mt-2">
-                      {categoryLabel(r.paper.eccg_category)}
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => act(r.paper.id, "approve")}
-                    disabled={isReadOnly || busy[r.paper.id]}
-                    className="inline-flex items-center gap-1 rounded-md border bg-emerald-100 px-3 py-1.5 font-medium text-emerald-700 hover:bg-emerald-200 disabled:opacity-50 dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900"
-                  >
-                    {busy[r.paper.id] ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Check className="h-3.5 w-3.5" />
-                    )}
-                    Approve
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => act(r.paper.id, "reject")}
-                    disabled={isReadOnly || busy[r.paper.id]}
-                    className="inline-flex items-center gap-1 rounded-md border bg-rose-100 px-3 py-1.5 font-medium text-rose-700 hover:bg-rose-200 disabled:opacity-50 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900"
-                  >
-                    {busy[r.paper.id] ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <X className="h-3.5 w-3.5" />
-                    )}
-                    Reject
-                  </button>
-                </div>
+                ))}
               </div>
-              {r.paper.abstract && (
-                <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">
-                  {r.paper.abstract}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+
+          {/* Selection bar */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={selected.size === data.records.length ? clearSelection : selectAll}
+              className="rounded-md border px-2.5 py-1 hover:bg-muted"
+            >
+              {selected.size === data.records.length ? "Clear selection" : "Select all"}
+            </button>
+            <span className="text-muted-foreground">
+              {selected.size} of {data.records.length} selected
+            </span>
+            <span className="ml-auto flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  bulkAct("approve", { paper_ids: Array.from(selected) }, "bulk approve")
+                }
+                disabled={selected.size === 0 || isReadOnly || bulkBusy}
+                className="inline-flex items-center gap-1 rounded-md border bg-emerald-100 px-3 py-1.5 font-medium text-emerald-700 hover:bg-emerald-200 disabled:opacity-50 dark:bg-emerald-950 dark:text-emerald-300"
+              >
+                {bulkBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+                Approve selected
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  bulkAct("reject", { paper_ids: Array.from(selected) }, "bulk reject")
+                }
+                disabled={selected.size === 0 || isReadOnly || bulkBusy}
+                className="inline-flex items-center gap-1 rounded-md border bg-rose-100 px-3 py-1.5 font-medium text-rose-700 hover:bg-rose-200 disabled:opacity-50 dark:bg-rose-950 dark:text-rose-300"
+              >
+                <X className="h-3.5 w-3.5" />
+                Reject selected
+              </button>
+            </span>
+          </div>
+
+          <ul className="space-y-3">
+            {data.records.map((r) => {
+              const isExpanded = expanded.has(r.paper.id);
+              const dig = digests[r.paper.id];
+              return (
+                <li key={r.paper.id} className="rounded-lg border bg-card p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(r.paper.id)}
+                        onChange={() => toggleSelected(r.paper.id)}
+                        className="mt-1.5 h-4 w-4 cursor-pointer accent-current"
+                        aria-label={`Select ${r.paper.title}`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/paper/${encodeURIComponent(r.paper.id)}`}
+                          className="line-clamp-2 text-base font-medium hover:underline"
+                        >
+                          {r.paper.title}
+                        </Link>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {r.paper.authors.slice(0, 3).map((a) => a.name).join(", ")}
+                          {r.paper.authors.length > 3 && ` +${r.paper.authors.length - 3}`}
+                          {" · "}
+                          {r.paper.venue?.name ?? "preprint"}
+                          {" · ingested "}
+                          {new Date(r.uploaded_at).toLocaleDateString()} by{" "}
+                          <strong>{r.uploaded_by}</strong>
+                          {" · "}
+                          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
+                            <FileSpreadsheet className="h-3 w-3" /> {r.source_file}
+                          </span>
+                        </div>
+                        {r.paper.eccg_category && (
+                          <Badge variant="outline" className="mt-2">
+                            {categoryLabel(r.paper.eccg_category)}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(r.paper.id)}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 hover:bg-muted"
+                        title="Generate / show LLM TL;DR"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        )}
+                        <Sparkles className="h-3 w-3" /> Quick read
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => act(r.paper.id, "approve")}
+                        disabled={isReadOnly || busy[r.paper.id]}
+                        className="inline-flex items-center gap-1 rounded-md border bg-emerald-100 px-3 py-1.5 font-medium text-emerald-700 hover:bg-emerald-200 disabled:opacity-50 dark:bg-emerald-950 dark:text-emerald-300"
+                      >
+                        {busy[r.paper.id] ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => act(r.paper.id, "reject")}
+                        disabled={isReadOnly || busy[r.paper.id]}
+                        className="inline-flex items-center gap-1 rounded-md border bg-rose-100 px-3 py-1.5 font-medium text-rose-700 hover:bg-rose-200 disabled:opacity-50 dark:bg-rose-950 dark:text-rose-300"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                  {isExpanded && (
+                    <div className="mt-3 rounded-md bg-muted/40 p-3 text-sm">
+                      {dig === "loading" ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" /> generating LLM TL;DR…
+                        </span>
+                      ) : dig === "error" || !dig ? (
+                        <span className="text-xs text-muted-foreground">
+                          {dig === "error" ? "Couldn't fetch digest. " : ""}Falling back to abstract:
+                          <span className="mt-1 block text-sm text-foreground">
+                            {r.paper.abstract ?? "(no abstract)"}
+                          </span>
+                        </span>
+                      ) : (
+                        <>
+                          <p className="text-foreground">{dig.tldr}</p>
+                          <p className="mt-2 text-[11px] text-muted-foreground">
+                            via{" "}
+                            <code className="rounded bg-background px-1">{dig.model}</code>
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {!isExpanded && r.paper.abstract && (
+                    <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">
+                      {r.paper.abstract}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </>
   );
@@ -213,10 +427,10 @@ export default function ReviewPage() {
 function Stat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
     <div
-      className={
-        "rounded-lg border bg-card p-3 " +
-        (highlight ? "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950" : "")
-      }
+      className={cn(
+        "rounded-lg border bg-card p-3",
+        highlight && "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950",
+      )}
     >
       <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className="mt-1 text-xl font-semibold tabular-nums">{value}</dd>

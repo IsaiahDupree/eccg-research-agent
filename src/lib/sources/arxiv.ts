@@ -16,12 +16,10 @@ import { isLikelyEventCameraPaper, ECCG_CORE_KEYWORDS } from "../taxonomy";
 const ARXIV_API = "https://export.arxiv.org/api/query";
 const DEFAULT_CATS = ["cs.CV", "cs.RO", "cs.NE"];
 
-function buildSearchQuery(niche: Niche, cats: string[]): string {
+function buildSearchQuery(cats: string[], keywords: readonly string[]): string {
   // arXiv search_query syntax: cat:cs.CV AND (abs:"event camera" OR abs:"event-based" OR ...)
   const catClause = cats.map((c) => `cat:${c}`).join(" OR ");
-  const kwClause = ECCG_CORE_KEYWORDS.map((k) => `abs:"${k}"`).join(" OR ");
-  // For non-ECCG niches we'd swap kwClause; V1 just hardcodes event-camera terms.
-  void niche;
+  const kwClause = keywords.map((k) => `abs:"${k}"`).join(" OR ");
   return `(${catClause}) AND (${kwClause})`;
 }
 
@@ -88,6 +86,8 @@ function entryToPaper(e: ArxivAtomEntry): Paper {
 export interface ArxivFetchOpts {
   niche?: Niche;
   categories?: string[];
+  /** Keyword filter for the search_query — defaults to event-camera core terms. */
+  keywords?: readonly string[];
   maxResults?: number;
   start?: number;
   sortBy?: "submittedDate" | "lastUpdatedDate" | "relevance";
@@ -97,13 +97,14 @@ export async function fetchArxivPapers(opts: ArxivFetchOpts = {}): Promise<Paper
   const {
     niche = "event_camera",
     categories = DEFAULT_CATS,
+    keywords = ECCG_CORE_KEYWORDS,
     maxResults = 50,
     start = 0,
     sortBy = "submittedDate",
   } = opts;
 
   const params = new URLSearchParams({
-    search_query: buildSearchQuery(niche, categories),
+    search_query: buildSearchQuery(categories, keywords),
     start: String(start),
     max_results: String(maxResults),
     sortBy,
@@ -123,10 +124,14 @@ export async function fetchArxivPapers(opts: ArxivFetchOpts = {}): Promise<Paper
     const xml = await res.text();
     const parsed = parser.parse(xml) as { feed?: { entry?: ArxivAtomEntry | ArxivAtomEntry[] } };
     const entries = asArray(parsed.feed?.entry);
-    return entries
-      .map(entryToPaper)
-      // Defensive: even though we filtered server-side, sanity-check
-      .filter((p) => isLikelyEventCameraPaper(`${p.title} ${p.abstract}`));
+    const filter =
+      niche === "event_camera"
+        ? (p: Paper) => isLikelyEventCameraPaper(`${p.title} ${p.abstract}`)
+        : (p: Paper) => {
+            const text = `${p.title} ${p.abstract}`.toLowerCase();
+            return keywords.some((k) => text.includes(k.toLowerCase()));
+          };
+    return entries.map(entryToPaper).filter(filter);
   });
 }
 
@@ -135,4 +140,25 @@ export function parseArxivXml(xml: string): Paper[] {
   const parsed = parser.parse(xml) as { feed?: { entry?: ArxivAtomEntry | ArxivAtomEntry[] } };
   const entries = asArray(parsed.feed?.entry);
   return entries.map(entryToPaper);
+}
+
+/**
+ * Fetch a single paper by its arXiv id (e.g. "2402.18221" — strip the `arxiv-`
+ * prefix and any version suffix first). Used by /api/ingest/by-arxiv-id for
+ * the gap-ingest button. Bypasses the keyword filter, since the caller is
+ * explicitly pulling this in — even if it's a cross-domain reference.
+ */
+export async function fetchArxivPaperById(arxivId: string): Promise<Paper | null> {
+  const cleanId = arxivId.replace(/^arxiv[-:]/i, "").replace(/v\d+$/i, "");
+  const params = new URLSearchParams({ id_list: cleanId, max_results: "1" });
+  const url = `${ARXIV_API}?${params}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "eccg-research-agent/0.1 (mailto:isaiahdupree33@gmail.com)" },
+  });
+  if (!res.ok) return null;
+  const xml = await res.text();
+  const parsed = parser.parse(xml) as { feed?: { entry?: ArxivAtomEntry | ArxivAtomEntry[] } };
+  const entries = asArray(parsed.feed?.entry);
+  if (entries.length === 0) return null;
+  return entryToPaper(entries[0]);
 }

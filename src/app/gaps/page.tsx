@@ -2,8 +2,10 @@ import Link from "next/link";
 import { ExternalLink, Search } from "lucide-react";
 import gapsRaw from "@/fixtures/eccg_gaps.json" with { type: "json" };
 import { Badge } from "@/components/Badge";
+import IngestButton from "./IngestButton";
 
-export const dynamic = "force-static";
+// Not force-static — the embedded IngestButton client component triggers
+// /api/ingest/by-arxiv-id, but the page shell itself stays cacheable.
 
 interface Gap {
   canonical_id: string;
@@ -86,6 +88,7 @@ export default function GapsPage() {
                     open <ExternalLink className="h-3 w-3" />
                   </a>
                 )}
+                {g.arxiv_id && <IngestButton arxivId={g.arxiv_id} />}
               </div>
             </div>
             {g.abstract && (

@@ -21,6 +21,163 @@ const MODES: { mode: Mode; label: string; Icon: typeof Trophy; help: string }[] 
   { mode: "controversial", label: "Controversial", Icon: AlertTriangle,  help: "Most up AND down votes — points of disagreement" },
 ];
 
+function row_influence(r: { influence: number }): number {
+  return r.influence;
+}
+
+interface InfluencePoint {
+  id: string;
+  title: string;
+  cited_by: number;
+  replication: number;
+  influence: number;
+}
+
+function InfluenceThumbnail({ rows }: { rows: InfluencePoint[] }) {
+  const maxCited = Math.max(1, ...rows.map((r) => r.cited_by));
+  const maxRepl = Math.max(1, ...rows.map((r) => r.replication));
+  const maxInf = Math.max(1, ...rows.map((r) => r.influence));
+  const W = 640;
+  const H = 200;
+  const pad = { l: 36, r: 16, t: 10, b: 24 };
+  const innerW = W - pad.l - pad.r;
+  const innerH = H - pad.t - pad.b;
+
+  const xFor = (cited: number) => pad.l + (cited / maxCited) * innerW;
+  const yFor = (repl: number) => pad.t + innerH - (repl / maxRepl) * innerH;
+  const rFor = (inf: number) => 2 + Math.sqrt(inf / maxInf) * 8;
+
+  // Gridlines at quartiles
+  const xTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * maxCited);
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * maxRepl);
+
+  return (
+    <div className="mb-4 rounded-lg border bg-card p-3">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-xs">
+        <div>
+          <strong className="text-sm">Influence map</strong>
+          <span className="ml-2 text-muted-foreground">
+            top {rows.length} — circle size ∝ influence score
+          </span>
+        </div>
+        <div className="text-muted-foreground">
+          x: total citations in corpus · y: replication-strength citations
+        </div>
+      </div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="h-auto w-full text-muted-foreground"
+        role="img"
+        aria-label="Scatter plot: in-corpus citation count vs replication-strength citations"
+      >
+        {/* gridlines */}
+        {xTicks.map((t, i) => (
+          <line
+            key={`xt-${i}`}
+            x1={xFor(t)}
+            x2={xFor(t)}
+            y1={pad.t}
+            y2={pad.t + innerH}
+            stroke="currentColor"
+            strokeOpacity={i === 0 ? 0.4 : 0.1}
+            strokeWidth={1}
+          />
+        ))}
+        {yTicks.map((t, i) => (
+          <line
+            key={`yt-${i}`}
+            x1={pad.l}
+            x2={pad.l + innerW}
+            y1={yFor(t)}
+            y2={yFor(t)}
+            stroke="currentColor"
+            strokeOpacity={i === 0 ? 0.4 : 0.1}
+            strokeWidth={1}
+          />
+        ))}
+        {/* axis labels */}
+        {[0, maxCited].map((t, i) => (
+          <text
+            key={`xl-${i}`}
+            x={xFor(t)}
+            y={H - 6}
+            fontSize={10}
+            textAnchor={i === 0 ? "start" : "end"}
+            fill="currentColor"
+          >
+            {Math.round(t)}
+          </text>
+        ))}
+        {[0, maxRepl].map((t, i) => (
+          <text
+            key={`yl-${i}`}
+            x={pad.l - 6}
+            y={yFor(t) + (i === 0 ? -3 : 9)}
+            fontSize={10}
+            textAnchor="end"
+            fill="currentColor"
+          >
+            {Math.round(t)}
+          </text>
+        ))}
+        {/* y=x reference line (replication == cited) */}
+        {(() => {
+          const lim = Math.min(maxCited, maxRepl);
+          if (lim <= 0) return null;
+          return (
+            <line
+              x1={xFor(0)}
+              y1={yFor(0)}
+              x2={xFor(lim)}
+              y2={yFor(lim)}
+              stroke="currentColor"
+              strokeDasharray="3 3"
+              strokeOpacity={0.2}
+            />
+          );
+        })()}
+        {/* points */}
+        {rows.map((r) => (
+          <a key={r.id} href={`/paper/${encodeURIComponent(r.id)}`}>
+            <circle
+              cx={xFor(r.cited_by)}
+              cy={yFor(r.replication)}
+              r={rFor(r.influence)}
+              fill="currentColor"
+              fillOpacity={0.55}
+              className="text-accent transition-opacity hover:fill-opacity-90"
+            >
+              <title>{`${r.title}\nin-corpus: ${r.cited_by} · replication: ${r.replication} · influence: ${r.influence.toFixed(1)}`}</title>
+            </circle>
+          </a>
+        ))}
+        {/* highlight top 3 with labels */}
+        {rows
+          .slice()
+          .sort((a, b) => b.influence - a.influence)
+          .slice(0, 3)
+          .map((r) => {
+            const cx = xFor(r.cited_by);
+            const cy = yFor(r.replication);
+            const lx = Math.min(cx + 8, W - pad.r - 4);
+            return (
+              <text
+                key={`lbl-${r.id}`}
+                x={lx}
+                y={cy - 6}
+                fontSize={10}
+                fill="currentColor"
+                className="pointer-events-none text-foreground"
+              >
+                {r.title.length > 36 ? `${r.title.slice(0, 36)}…` : r.title}
+              </text>
+            );
+          })}
+      </svg>
+    </div>
+  );
+}
+
 export default function LeaderboardPage() {
   const [scored, setScored] = useState<ScoredPaper[]>([]);
   const [mode, setMode] = useState<Mode>("top");
@@ -122,6 +279,18 @@ export default function LeaderboardPage() {
           {ranked.length.toLocaleString()} paper{ranked.length === 1 ? "" : "s"} voted on
         </span>
       </div>
+
+      {mode === "influence" && ranked.length > 0 && (
+        <InfluenceThumbnail
+          rows={ranked.slice(0, 60).map((r) => ({
+            id: r.scored.paper.id,
+            title: r.scored.paper.title,
+            cited_by: r.cited_by,
+            replication: r.replication,
+            influence: row_influence(r),
+          }))}
+        />
+      )}
 
       <ol className="rounded-lg border" suppressHydrationWarning>
         {!loaded ? (
