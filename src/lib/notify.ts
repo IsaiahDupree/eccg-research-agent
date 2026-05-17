@@ -71,3 +71,85 @@ export function tgLink(title: string, url: string): string {
 export function tgEscape(s: string): string {
   return htmlEscape(s);
 }
+
+// ---------------------------------------------------------------------------
+// Slack — optional second channel
+// ---------------------------------------------------------------------------
+
+export interface SlackSendResult {
+  ok: boolean;
+  error?: string;
+}
+
+export function isSlackConfigured(): boolean {
+  return Boolean(process.env.SLACK_WEBHOOK_URL?.trim());
+}
+
+/**
+ * Convert the HTML we send to Telegram into Slack mrkdwn. Best-effort:
+ *   <b>x</b> / <strong>x</strong>  → *x*
+ *   <i>x</i> / <em>x</em>          → _x_
+ *   <a href="u">t</a>              → <u|t>
+ *   <code>x</code>                 → `x`
+ *   <br/> / <br>                   → \n
+ *   &amp; / &lt; / &gt;            → literal chars
+ *   Any other tags                 → stripped
+ */
+function htmlToSlackMrkdwn(html: string): string {
+  return html
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<\s*(b|strong)\s*>([\s\S]*?)<\s*\/\s*\1\s*>/gi, "*$2*")
+    .replace(/<\s*(i|em)\s*>([\s\S]*?)<\s*\/\s*\1\s*>/gi, "_$2_")
+    .replace(/<\s*code\s*>([\s\S]*?)<\s*\/\s*code\s*>/gi, "`$1`")
+    .replace(/<\s*a\s+href\s*=\s*"([^"]+)"[^>]*>([\s\S]*?)<\s*\/\s*a\s*>/gi, "<$1|$2>")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+export async function sendSlack(
+  text: string,
+  opts: { isHtml?: boolean } = {},
+): Promise<SlackSendResult> {
+  const url = process.env.SLACK_WEBHOOK_URL?.trim();
+  if (!url) {
+    return { ok: false, error: "slack_not_configured" };
+  }
+  const payload = opts.isHtml ? htmlToSlackMrkdwn(text) : text;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: payload.slice(0, 4000), mrkdwn: true }),
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `slack ${res.status}: ${(await res.text()).slice(0, 200)}`,
+      };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Fan out the same HTML payload to every configured channel. Telegram
+ * receives HTML directly; Slack gets a converted mrkdwn variant. Returns
+ * per-channel results so callers can log whichever succeeded.
+ */
+export async function notifyAll(
+  html: string,
+  opts: { silent?: boolean; disablePreview?: boolean } = {},
+): Promise<{
+  telegram: TelegramSendResult | null;
+  slack: SlackSendResult | null;
+}> {
+  const [telegram, slack] = await Promise.all([
+    isTelegramConfigured() ? sendTelegram(html, opts) : Promise.resolve(null),
+    isSlackConfigured() ? sendSlack(html, { isHtml: true }) : Promise.resolve(null),
+  ]);
+  return { telegram, slack };
+}

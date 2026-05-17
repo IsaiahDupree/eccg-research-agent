@@ -11,7 +11,13 @@ import { NextResponse } from "next/server";
 import { loadCollab } from "@/lib/collab";
 import { readState } from "@/lib/google/state";
 import { generateCommentary, CommentaryUnavailableError } from "@/lib/llm/commentary";
-import { sendTelegram, isTelegramConfigured, htmlEscape, tgLink } from "@/lib/notify";
+import {
+  notifyAll,
+  isTelegramConfigured,
+  isSlackConfigured,
+  htmlEscape,
+  tgLink,
+} from "@/lib/notify";
 import type { Paper } from "@/lib/models";
 
 const STATE_NAME = "custom-corpus";
@@ -242,21 +248,26 @@ export async function GET(req: Request) {
       }
     }
   }
-  let telegramResult: { ok: boolean; error?: string } | null = null;
-  if (notify && isTelegramConfigured()) {
-    telegramResult = await sendTelegram(payloadToTelegram(payload));
+  let notifyResult: Awaited<ReturnType<typeof notifyAll>> | null = null;
+  if (notify && (isTelegramConfigured() || isSlackConfigured())) {
+    notifyResult = await notifyAll(payloadToTelegram(payload));
   }
 
   if (format === "json") {
-    return NextResponse.json({ ok: true, payload, commentary, telegram: telegramResult });
+    return NextResponse.json({ ok: true, payload, commentary, notify: notifyResult });
   }
   const md = payloadToMarkdown(payload, commentary ?? undefined);
+  const tg = notifyResult?.telegram;
+  const sl = notifyResult?.slack;
   return new Response(md, {
     headers: {
       "content-type": "text/markdown; charset=utf-8",
       "cache-control": "no-store",
-      ...(telegramResult
-        ? { "x-eccg-telegram": telegramResult.ok ? "sent" : `error: ${telegramResult.error ?? "?"}` }
+      ...(tg
+        ? { "x-eccg-telegram": tg.ok ? "sent" : `error: ${tg.error ?? "?"}` }
+        : {}),
+      ...(sl
+        ? { "x-eccg-slack": sl.ok ? "sent" : `error: ${sl.error ?? "?"}` }
         : {}),
     },
   });

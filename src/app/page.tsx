@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { loadSeedPipeline } from "@/lib/seed";
 import { PaperList } from "@/components/PaperList";
+import { TrendingStrip, type TrendingItem } from "@/components/TrendingStrip";
 
 export const dynamic = "force-static";
 
@@ -9,6 +10,27 @@ export default function HomePage() {
   const topVelocity = [...result.raw.velocities].sort(
     (a, b) => b.multiplier - a.multiplier,
   )[0];
+
+  const byId = new Map(result.scored.map((s) => [s.paper.id, s]));
+  // Trending = velocity multiplier with a soft recency decay so 5-year-old
+  // citation magnets don't permanently camp the top. Half-life ~12 mo
+  // after a 6-month "fresh" floor.
+  const trending: TrendingItem[] = result.raw.velocities
+    .map((v) => {
+      const s = byId.get(v.paper_id);
+      if (!s) return null;
+      const months = s.paper.months_since_publish;
+      const recency = Math.exp(-Math.max(0, months - 6) / 12);
+      return {
+        scored: s,
+        multiplier: v.multiplier,
+        trend_score: v.multiplier * recency,
+      };
+    })
+    .filter((x): x is TrendingItem => Boolean(x))
+    .filter((x) => x.multiplier >= 1.5)
+    .sort((a, b) => b.trend_score - a.trend_score)
+    .slice(0, 3);
   return (
     <>
       <section className="mb-8">
@@ -48,6 +70,7 @@ export default function HomePage() {
           />
         </dl>
       </section>
+      <TrendingStrip items={trending} />
       <Suspense fallback={null}>
         <PaperList scored={result.scored} />
       </Suspense>

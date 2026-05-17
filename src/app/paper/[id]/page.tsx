@@ -10,7 +10,7 @@ import { getNeighbors } from "@/lib/similarity";
 import { NotesPanel } from "@/components/NotesPanel";
 import { VoteWidget } from "@/components/VoteWidget";
 import { CompareWithLibraryButton } from "@/components/CompareWithLibraryButton";
-import { getCitationEdges } from "@/lib/citations";
+import { getCitationEdges, getIntentCounts } from "@/lib/citations";
 
 export const dynamicParams = true;
 
@@ -199,8 +199,8 @@ export default async function PaperPage({ params }: Params) {
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   Papers this one explicitly references that are also in the ECCG corpus.
                 </p>
-                <ul className="mt-2 space-y-2 text-sm">
-                  {cites.slice(0, 8).map((c) => (
+                <ul className="mt-2 max-h-96 space-y-2 overflow-y-auto pr-1 text-sm">
+                  {cites.map((c) => (
                     <li key={c.s.paper.id}>
                       <Link
                         href={`/paper/${encodeURIComponent(c.s.paper.id)}`}
@@ -226,59 +226,79 @@ export default async function PaperPage({ params }: Params) {
                       </div>
                     </li>
                   ))}
-                  {cites.length > 8 && (
-                    <li className="text-xs text-muted-foreground">
-                      …and {cites.length - 8} more
-                    </li>
-                  )}
                 </ul>
               </div>
             )}
-            {citedBy.length > 0 && (
-              <div className="rounded-lg border p-4">
-                <h3 className="text-sm font-medium">
-                  Cited by{" "}
-                  <span className="text-muted-foreground">({citedBy.length})</span>
-                </h3>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Other corpus papers that reference this one. Green = built on this work
-                  (methodology / result / extension). Gray = named in background.
-                </p>
-                <ul className="mt-2 space-y-2 text-sm">
-                  {citedBy.slice(0, 8).map((c) => (
-                    <li key={c.s.paper.id}>
-                      <Link
-                        href={`/paper/${encodeURIComponent(c.s.paper.id)}`}
-                        className="line-clamp-2 hover:underline"
-                      >
-                        {c.s.paper.title}
-                      </Link>
-                      <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                        <span>score {c.s.total.toFixed(0)} · {formatMonthsAgo(c.s.paper.months_since_publish)}</span>
-                        {c.intents.map((i) => (
-                          <Badge
-                            key={i}
-                            variant={
-                              i === "methodology" || i === "result" || i === "extensionMethodology"
-                                ? "success"
-                                : "muted"
-                            }
-                            className="ml-1"
+            {citedBy.length > 0 &&
+              (() => {
+                const ic = getIntentCounts(scored.paper.id);
+                return (
+                  <div className="rounded-lg border p-4">
+                    <h3 className="text-sm font-medium">
+                      Cited by{" "}
+                      <span className="text-muted-foreground">({citedBy.length})</span>
+                    </h3>
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                      Of {ic.total} corpus citations:
+                      {ic.methodology > 0 && (
+                        <Badge variant="success" className="ml-1">
+                          {ic.methodology} methodology
+                        </Badge>
+                      )}
+                      {ic.result > 0 && (
+                        <Badge variant="success">
+                          {ic.result} result
+                        </Badge>
+                      )}
+                      {ic.extensionMethodology > 0 && (
+                        <Badge variant="success">
+                          {ic.extensionMethodology} extension
+                        </Badge>
+                      )}
+                      {ic.background > 0 && (
+                        <Badge variant="muted">
+                          {ic.background} background
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Green = built on this work (methodology / result / extension).
+                      Gray = named in background.
+                    </p>
+                    <ul className="mt-2 max-h-96 space-y-2 overflow-y-auto pr-1 text-sm">
+                      {citedBy.map((c) => (
+                        <li key={c.s.paper.id}>
+                          <Link
+                            href={`/paper/${encodeURIComponent(c.s.paper.id)}`}
+                            className="line-clamp-2 hover:underline"
                           >
-                            {i}
-                          </Badge>
-                        ))}
-                      </div>
-                    </li>
-                  ))}
-                  {citedBy.length > 8 && (
-                    <li className="text-xs text-muted-foreground">
-                      …and {citedBy.length - 8} more
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
+                            {c.s.paper.title}
+                          </Link>
+                          <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                            <span>
+                              score {c.s.total.toFixed(0)} ·{" "}
+                              {formatMonthsAgo(c.s.paper.months_since_publish)}
+                            </span>
+                            {c.intents.map((i) => (
+                              <Badge
+                                key={i}
+                                variant={
+                                  i === "methodology" || i === "result" || i === "extensionMethodology"
+                                    ? "success"
+                                    : "muted"
+                                }
+                                className="ml-1"
+                              >
+                                {i}
+                              </Badge>
+                            ))}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
           </section>
         )}
 

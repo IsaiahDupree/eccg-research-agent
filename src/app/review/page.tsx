@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileSpreadsheet,
+  History,
   Loader2,
   Lock,
   ShieldCheck,
@@ -45,6 +46,17 @@ interface ReviewResponse {
   records: UploadedRecord[];
 }
 
+interface AuditEntry {
+  at: string;
+  actor: string;
+  action: "approve" | "reject";
+  paper_ids: string[];
+  category?: string;
+  niche?: string;
+  note?: string;
+  source: "single" | "bulk_ids" | "bulk_category";
+}
+
 function nicheOfRecord(r: UploadedRecord): string {
   // uploaded_by="cron:<niche>" for cron-discovered papers; spreadsheet/user
   // uploads default to event_camera (the founding niche).
@@ -65,10 +77,16 @@ export default function ReviewPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [nicheFilter, setNicheFilter] = useState<string>("all");
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
 
   const refresh = useCallback(async () => {
-    const r = await fetch("/api/corpus/custom?status=pending", { cache: "no-store" });
-    setData(await r.json());
+    const [recordsR, auditR] = await Promise.all([
+      fetch("/api/corpus/custom?status=pending", { cache: "no-store" }),
+      fetch("/api/review/audit?limit=20", { cache: "no-store" }),
+    ]);
+    setData(await recordsR.json());
+    const a = await auditR.json();
+    setAudit(Array.isArray(a.entries) ? a.entries : []);
   }, []);
 
   useEffect(() => {
@@ -377,6 +395,56 @@ export default function ReviewPage() {
               </button>
             </span>
           </div>
+
+          {audit.length > 0 && (
+            <div className="mb-4 rounded-lg border bg-card p-3">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <History className="h-3 w-3" /> Recent decisions
+              </h3>
+              <ul className="space-y-1.5 text-xs">
+                {audit.slice(0, 8).map((e, i) => (
+                  <li key={`${e.at}-${i}`} className="flex flex-wrap items-baseline gap-1.5">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                        e.action === "approve"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                          : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+                      )}
+                    >
+                      {e.action === "approve" ? (
+                        <Check className="h-2.5 w-2.5" />
+                      ) : (
+                        <X className="h-2.5 w-2.5" />
+                      )}
+                      {e.action}
+                    </span>
+                    <span className="font-medium">{e.actor}</span>
+                    <span className="text-muted-foreground">
+                      {e.source === "bulk_category"
+                        ? `all ${e.paper_ids.length} in ${e.category ?? "?"}`
+                        : e.source === "bulk_ids"
+                          ? `${e.paper_ids.length} papers`
+                          : "1 paper"}
+                    </span>
+                    {e.note && (
+                      <span className="text-muted-foreground italic">
+                        “{e.note.length > 60 ? `${e.note.slice(0, 60)}…` : e.note}”
+                      </span>
+                    )}
+                    <span className="ml-auto text-muted-foreground tabular-nums">
+                      {new Date(e.at).toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+                {audit.length > 8 && (
+                  <li className="text-muted-foreground">
+                    +{audit.length - 8} earlier decisions
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
 
           <ul className="space-y-3">
             {filteredRecords.map((r) => {

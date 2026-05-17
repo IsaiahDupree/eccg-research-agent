@@ -3,7 +3,13 @@ import { assignRelevance } from "@/lib/analysis/relevance";
 import { embedPapersIncremental, hasOpenAi } from "@/lib/embeddings";
 import { readState, writeState } from "@/lib/google/state";
 import { NICHES, findNiche, type NicheConfig } from "@/lib/niches";
-import { sendTelegram, isTelegramConfigured, htmlEscape, tgLink } from "@/lib/notify";
+import {
+  notifyAll,
+  isTelegramConfigured,
+  isSlackConfigured,
+  htmlEscape,
+  tgLink,
+} from "@/lib/notify";
 import { fetchArxivPapers } from "@/lib/sources/arxiv";
 import { fetchArxivRssPapers } from "@/lib/sources/arxiv_rss";
 import type { Paper } from "@/lib/models";
@@ -153,9 +159,15 @@ export async function GET(req: Request) {
       }
     }
 
-    let telegram: { ok: boolean; error?: string } | null = null;
+    let notifyResult: {
+      telegram: { ok: boolean; error?: string } | null;
+      slack: { ok: boolean; error?: string } | null;
+    } | null = null;
     const minToNotify = Number(process.env.REFRESH_NOTIFY_MIN ?? "1");
-    if (allAdditions.length >= minToNotify && isTelegramConfigured()) {
+    if (
+      allAdditions.length >= minToNotify &&
+      (isTelegramConfigured() || isSlackConfigured())
+    ) {
       const list = allAdditions
         .slice(0, 5)
         .map((a, i) => {
@@ -172,7 +184,7 @@ export async function GET(req: Request) {
         .filter((r) => r.added > 0)
         .map((r) => `${r.niche}: <b>${r.added}</b>`)
         .join(", ");
-      telegram = await sendTelegram(
+      notifyResult = await notifyAll(
         `<b>${allAdditions.length} new paper${allAdditions.length === 1 ? "" : "s"}</b> across ${reports.filter((r) => r.added > 0).length} niche${reports.filter((r) => r.added > 0).length === 1 ? "" : "s"} (${byNiche})\n\n${list}${more}\n\n${htmlEscape(SITE_URL)}/?sort=new`,
       );
     }
@@ -183,7 +195,7 @@ export async function GET(req: Request) {
       niches: reports,
       added: allAdditions.length,
       embed: embedReport,
-      telegram,
+      notify: notifyResult,
       newest: allAdditions.slice(0, 5).map((a) => ({
         id: a.paper.id,
         title: a.paper.title,

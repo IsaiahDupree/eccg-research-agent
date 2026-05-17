@@ -14,6 +14,7 @@ import {
   saveCustomCorpus,
 } from "@/lib/custom_corpus";
 import { isEditor, isEditorsEnforced, listEditors, listEditorEmails } from "@/lib/editors";
+import { appendAudit } from "@/lib/review_audit";
 
 export const runtime = "nodejs";
 
@@ -51,14 +52,27 @@ export async function POST(req: Request) {
   if (idx < 0) {
     return NextResponse.json({ ok: false, error: "paper not found" }, { status: 404 });
   }
+  const reviewedAt = new Date().toISOString();
   records[idx] = {
     ...records[idx],
     status: action === "approve" ? "approved" : "rejected",
     reviewed_by: session?.email ?? user,
-    reviewed_at: new Date().toISOString(),
+    reviewed_at: reviewedAt,
     review_note: body.note?.slice(0, 400),
   };
   await saveCustomCorpus(records);
+
+  // Append-only audit log — best-effort so a Drive hiccup never blocks
+  // the actual review write.
+  appendAudit({
+    at: reviewedAt,
+    actor: session?.email ?? user,
+    action,
+    paper_ids: [paper_id],
+    note: body.note?.slice(0, 200),
+    source: "single",
+  }).catch((err) => console.warn("audit append failed:", err));
+
   return NextResponse.json({
     ok: true,
     state_file: CUSTOM_CORPUS_STATE,

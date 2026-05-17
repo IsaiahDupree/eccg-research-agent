@@ -17,6 +17,7 @@ import {
   statusOf,
 } from "@/lib/custom_corpus";
 import { isEditor, isEditorsEnforced, listEditors, listEditorEmails } from "@/lib/editors";
+import { appendAudit } from "@/lib/review_audit";
 
 export const runtime = "nodejs";
 
@@ -96,6 +97,18 @@ export async function POST(req: Request) {
     changed++;
   }
   await saveCustomCorpus(records);
+
+  // Audit: log the bulk action so /review can show "approved 32 control_robotics"
+  // alongside the single-paper acts. Best-effort.
+  appendAudit({
+    at: reviewedAt,
+    actor: reviewedBy,
+    action,
+    paper_ids: Array.from(targetIds),
+    category: body.category,
+    note,
+    source: body.category ? "bulk_category" : "bulk_ids",
+  }).catch((err) => console.warn("audit append failed:", err));
 
   return NextResponse.json({
     ok: true,
