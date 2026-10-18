@@ -1,0 +1,28 @@
+{
+  "supplements_snapshot": "9993292efd509670-r2",
+  "source_roots": [
+    "C:/Users/Isaia/Documents/Coding/eccg-research-agent"
+  ],
+  "files": {
+    "src/app/api/library/export/route.ts": {
+      "source": "C:\\Users\\Isaia\\Documents\\Coding\\eccg-research-agent\\src\\app\\api\\library\\export\\route.ts",
+      "reason": "portable authored code absent from staged source selection"
+    },
+    "src/app/api/library/route.ts": {
+      "source": "C:\\Users\\Isaia\\Documents\\Coding\\eccg-research-agent\\src\\app\\api\\library\\route.ts",
+      "reason": "portable authored code absent from staged source selection"
+    },
+    "src/app/library/layout.tsx": {
+      "source": "C:\\Users\\Isaia\\Documents\\Coding\\eccg-research-agent\\src\\app\\library\\layout.tsx",
+      "reason": "portable authored code absent from staged source selection"
+    },
+    "src/app/library/page.tsx": {
+      "source": "C:\\Users\\Isaia\\Documents\\Coding\\eccg-research-agent\\src\\app\\library\\page.tsx",
+      "reason": "portable authored code absent from staged source selection"
+    },
+    "src/lib/auth/session.ts": {
+      "source": "C:\\Users\\Isaia\\Documents\\Coding\\eccg-research-agent\\src\\lib\\auth\\session.ts",
+      "reason": "portable authored code absent from staged source selection"
+    }
+  }
+}
