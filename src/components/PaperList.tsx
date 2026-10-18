@@ -1,0 +1,283 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Flame, FileQuestion, Sparkles, Trophy } from "lucide-react";
+import { FilterBar } from "./FilterBar";
+import { EmptyState } from "./EmptyState";
+import { PaperRow } from "./PaperRow";
+import { hotness, netToRubricRaw, useVotes } from "@/lib/votes_client";
+import { asScored, useCustomCorpus } from "@/lib/custom_corpus_client";
+import { useNiche } from "@/lib/niche_client";
+import { matchesNiche } from "@/lib/niches";
+import { cn } from "@/lib/utils";
+import type { ScoredPaper } from "@/lib/models";
+
+interface PaperListProps {
+  scored: ScoredPaper[];
+}
+
+const PAGE_SIZE = 50;
+
+type SortMode = "top" | "hot" | "new";
+
+const SORT_MODES: { mode: SortMode; label: string; Icon: typeof Flame; help: string }[] = [
+  { mode: "top",  label: "Top",  Icon: Trophy,   help: "Rubric score + community votes" },
+  { mode: "hot",  label: "Hot",  Icon: Flame,    help: "Vote momentum, recency-decayed" },
+  { mode: "new",  label: "New",  Icon: Sparkles, help: "Most recently published" },
+];
+
+function parseCategoryParam(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+function parseSortParam(raw: string | null): SortMode {
+  return raw === "hot" || raw === "new" ? raw : "top";
+}
+
+function communityBoost(net: number | undefined): number {
+  if (!net) return 0;
+  const raw = netToRubricRaw(net);             // 0-10
+  return ((raw - 5) * 10) / 10;
+}
+
+export function PaperList({ scored }: PaperListProps) {
+  const params = useSearchParams();
+  const [active, setActive] = useState<string[]>(parseCategoryParam(params.get("category")));
+  const [query, setQuery] = useState(params.get("q") ?? "");
+  const [sort, setSort] = useState<SortMode>(parseSortParam(params.get("sort")));
+  const [page, setPage] = useState(0);
+  const { votes } = useVotes();
+  const { records: uploaded } = useCustomCorpus();
+  const { niche } = useNiche();
+
+  useEffect(() => {
+    setQuery(params.get("q") ?? "");
+    setActive(parseCategoryParam(params.get("category")));
+    setSort(parseSortParam(params.get("sort")));
+    setPage(0);
+  }, [params]);
+
+  // Debounced sync of the live query into the URL so search results are
+  // shareable. We don't push() — replaceState avoids cluttering history.
+  const initialQueryRef = useRef(params.get("q") ?? "");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Skip the very first effect run (when query was just hydrated from the URL).
+    if (query === initialQueryRef.current) return;
+    const t = setTimeout(() => {
+      const url = new URL(window.location.href);
+      if (query) url.searchParams.set("q", query);
+      else url.searchParams.delete("q");
+      window.history.replaceState(null, "", url.toString());
+      initialQueryRef.current = query;
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const merged = useMemo(() => {
+    const knownIds = new Set(scored.map((s) => s.paper.id));
+    const additions = uploaded
+      // Hide papers still in the review queue from the public rankings.
+      .filter((r) => (r.status ?? "approved") === "approved")
+      .filter((r) => !knownIds.has(r.paper.id))
+      .map(asScored);
+    const all = [...scored, ...additions];
+    // Niche filter — event_camera is permissive (matchesNiche short-circuits).
+    if (niche.slug === "event_camera") return all;
+    return all.filter((s) =>
+      matchesNiche(`${s.paper.title} ${s.paper.abstract}`, niche),
+    );
+  }, [scored, uploaded, niche]);
+
+  const categories = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of merged) {
+      const slug = s.paper.eccg_category ?? "unclassified";
+      m.set(slug, (m.get(slug) ?? 0) + 1);
+    }
+    return Array.from(m, ([slug, count]) => ({ slug, count }));
+  }, [merged]);
+
+  const sortedAndFiltered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const activeSet = new Set(active);
+
+    type Decorated = {
+      scored: ScoredPaper;
+      adjusted: number;
+      hot: number;
+      net: number;
+    };
+
+    const decorated: Decorated[] = merged.map((s) => {
+      // Use editor-weighted net for ranking — that's the same signal the
+      // leaderboard's influence mode uses, so the two views stay coherent.
+      const tally = votes[s.paper.id];
+      const weighted = tally?.weighted_net ?? tally?.net ?? 0;
+      const boost = communityBoost(weighted);
+      return {
+        scored: s,
+        adjusted: Math.min(100, s.total + boost),
+        hot: hotness(weighted, s.paper.months_since_publish),
+        net: weighted,
+      };
+    });
+
+    const filtered = decorated.filter(({ scored: s }) => {
+      if (activeSet.size > 0) {
+        const slug = s.paper.eccg_category ?? "unclassified";
+        if (!activeSet.has(slug)) return false;
+      }
+      if (!q) return true;
+      const haystack =
+        `${s.paper.title} ${s.paper.abstract} ${s.paper.authors.map((a) => a.name).join(" ")}`.toLowerCase();
+      return haystack.includes(q);
+    });
+
+    if (sort === "top") {
+      filtered.sort((a, b) => b.adjusted - a.adjusted);
+    } else if (sort === "hot") {
+      filtered.sort((a, b) => {
+        if (b.hot !== a.hot) return b.hot - a.hot;
+        return b.adjusted - a.adjusted;
+      });
+    } else {
+      filtered.sort(
+        (a, b) => a.scored.paper.months_since_publish - b.scored.paper.months_since_publish,
+      );
+    }
+    return filtered;
+  }, [merged, query, active, sort, votes]);
+
+  function toggleCategory(slug: string) {
+    setActive((prev) => {
+      const next = prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug];
+      setPage(0);
+      return next;
+    });
+  }
+  function clearCategories() {
+    setActive([]);
+    setPage(0);
+  }
+
+  const pageStart = page * PAGE_SIZE;
+  const pageItems = sortedAndFiltered.slice(pageStart, pageStart + PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(sortedAndFiltered.length / PAGE_SIZE));
+
+  return (
+    <section>
+      <FilterBar
+        categories={categories}
+        active={active}
+        onToggle={toggleCategory}
+        onClear={clearCategories}
+        query={query}
+        onQueryChange={(q) => {
+          setQuery(q);
+          setPage(0);
+        }}
+        totalMatching={sortedAndFiltered.length}
+      />
+
+      <div className="mb-3 flex items-center gap-1 text-sm">
+        <span className="mr-2 text-xs uppercase tracking-wide text-muted-foreground">Sort</span>
+        {SORT_MODES.map(({ mode, label, Icon, help }) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => {
+              setSort(mode);
+              setPage(0);
+            }}
+            aria-pressed={sort === mode}
+            title={help}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs transition-colors",
+              sort === mode
+                ? "border-accent bg-accent text-accent-foreground"
+                : "hover:bg-muted",
+            )}
+          >
+            <Icon className="h-3 w-3" /> {label}
+          </button>
+        ))}
+        <span className="ml-2 text-xs text-muted-foreground">
+          niche: <strong>{niche.label}</strong>
+        </span>
+      </div>
+
+      <div>
+        {sortedAndFiltered.length === 0 ? (
+          <EmptyState
+            icon={FileQuestion}
+            title="No papers match the current filter"
+            description={
+              query || active.length > 0
+                ? "Try clearing the search or category filters."
+                : `No papers tagged for the ${niche.label} niche yet. The daily cron checks for new arXiv submissions every morning.`
+            }
+            cta={
+              query || active.length > 0
+                ? {
+                    onClick: () => {
+                      setQuery("");
+                      setActive([]);
+                      setPage(0);
+                    },
+                    label: "Clear filters",
+                  }
+                : undefined
+            }
+          />
+        ) : (
+          <div className="rounded-lg border">{pageItems.map((d, i) => (
+            <PaperRow
+              key={d.scored.paper.id}
+              scored={d.scored}
+              rank={pageStart + i + 1}
+              displayScore={sort === "top" ? d.adjusted : d.scored.total}
+              highlight={query.trim()}
+              scoreSubLabel={
+                sort === "hot"
+                  ? `hot ${d.hot.toFixed(2)} · net ${d.net >= 0 ? "+" : ""}${d.net}`
+                  : sort === "new"
+                    ? `new · ${d.scored.paper.months_since_publish.toFixed(1)} mo old`
+                    : d.net !== 0
+                      ? `community ${d.net >= 0 ? "+" : ""}${d.net}`
+                      : undefined
+              }
+            />
+          ))}</div>
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <nav className="mt-4 flex items-center justify-between text-sm">
+          <button
+            type="button"
+            disabled={page === 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="rounded-md border px-3 py-1.5 disabled:opacity-40 hover:bg-muted disabled:hover:bg-transparent"
+          >
+            ← Prev
+          </button>
+          <span className="text-muted-foreground">
+            Page {page + 1} of {totalPages.toLocaleString()} ·{" "}
+            {sortedAndFiltered.length.toLocaleString()} papers
+          </span>
+          <button
+            type="button"
+            disabled={page + 1 >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="rounded-md border px-3 py-1.5 disabled:opacity-40 hover:bg-muted disabled:hover:bg-transparent"
+          >
+            Next →
+          </button>
+        </nav>
+      )}
+    </section>
+  );
+}

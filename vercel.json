@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/refresh",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/digest/weekly?notify=1",
+      "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/health/arxiv-rss?notify=1",
+      "schedule": "30 6 * * *"
+    }
+  ]
+}

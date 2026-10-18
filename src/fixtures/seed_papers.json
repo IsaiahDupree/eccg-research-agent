@@ -1,0 +1,215 @@
+[
+  {
+    "id": "arxiv-2401.02410",
+    "arxiv_id": "2401.02410",
+    "title": "E2VID++: Higher-Resolution Event-to-Video Reconstruction with Transformers",
+    "abstract": "Event cameras report asynchronous per-pixel brightness changes with microsecond latency, but converting their sparse stream back into a frame-based video remains the de facto gateway for downstream computer-vision pipelines. We introduce E2VID++, a transformer-based event-to-video reconstruction network that operates at 720p in real time on a single GPU. By combining a streaming attention module with a learned temporal denoiser we push state-of-the-art reconstruction PSNR by 1.8 dB on the ECD and MVSEC benchmarks. Code and pretrained weights are released.",
+    "authors": [
+      { "name": "Henri Rebecq" },
+      { "name": "Daniel Gehrig" },
+      { "name": "Davide Scaramuzza" }
+    ],
+    "venue": { "name": "CVPR", "type": "conference", "prestige": 9 },
+    "published_at": "2026-01-04T12:00:00Z",
+    "categories": ["cs.CV", "cs.RO"],
+    "pdf_url": "https://arxiv.org/pdf/2401.02410",
+    "html_url": "https://arxiv.org/abs/2401.02410",
+    "citation_count": 42,
+    "influential_citation_count": 6,
+    "months_since_publish": 4.3,
+    "citations_per_month": 9.77,
+    "eccg_category": "reconstruction",
+    "eccg_relevance": 0.95
+  },
+  {
+    "id": "arxiv-2402.01133",
+    "arxiv_id": "2402.01133",
+    "title": "DSEC-Flow: A Large-Scale Driving Dataset for Event-Based Optical Flow",
+    "abstract": "We release DSEC-Flow, a 12-hour driving dataset captured with a stereo Prophesee Gen-4 event camera rig synchronized to a frame camera. Pixel-accurate optical flow ground truth is generated via a high-precision LiDAR reprojection pipeline. DSEC-Flow contains 1.2 million labeled event-flow pairs across day, night, tunnel, and rain conditions — 4× the size of MVSEC. We benchmark seven existing event-based optical flow methods and show that performance degrades by 32% under low-light conditions where DSEC-Flow is largest. Dataset, evaluation server, and baseline checkpoints are public.",
+    "authors": [
+      { "name": "Mathias Gehrig", "h_index": 28 },
+      { "name": "Davide Scaramuzza", "h_index": 75 }
+    ],
+    "venue": { "name": "IEEE RA-L", "type": "journal", "prestige": 8 },
+    "published_at": "2026-02-02T08:00:00Z",
+    "categories": ["cs.CV", "cs.RO"],
+    "pdf_url": "https://arxiv.org/pdf/2402.01133",
+    "html_url": "https://arxiv.org/abs/2402.01133",
+    "citation_count": 23,
+    "influential_citation_count": 4,
+    "months_since_publish": 3.4,
+    "citations_per_month": 6.76,
+    "eccg_category": "dataset",
+    "eccg_relevance": 0.92
+  },
+  {
+    "id": "arxiv-2403.11421",
+    "arxiv_id": "2403.11421",
+    "title": "Asynchronous Spiking Object Detection on Loihi 2 for Drone Collision Avoidance",
+    "abstract": "We deploy a fully asynchronous spiking object detector on Intel's Loihi 2 neuromorphic chip and integrate it with a 250-gram quadrotor for end-to-end on-board collision avoidance. The network ingests raw DVS events at 1 MHz, predicts bounding boxes through a spiking YOLO-style head, and emits motor commands every 4 ms. Closed-loop flight tests in cluttered indoor environments show a 92% obstacle-avoidance success rate at 6 m/s — a 38% improvement over the strongest GPU baseline at 8× lower power. We make all chip configurations public.",
+    "authors": [
+      { "name": "Antonio Vitale" },
+      { "name": "Chiara Bartolozzi" },
+      { "name": "Garrick Orchard", "h_index": 32 }
+    ],
+    "venue": { "name": "Science Robotics", "type": "journal", "prestige": 10 },
+    "published_at": "2026-03-15T10:00:00Z",
+    "categories": ["cs.RO", "cs.NE"],
+    "pdf_url": "https://arxiv.org/pdf/2403.11421",
+    "html_url": "https://arxiv.org/abs/2403.11421",
+    "citation_count": 18,
+    "influential_citation_count": 3,
+    "months_since_publish": 2.0,
+    "citations_per_month": 9.0,
+    "eccg_category": "control_robotics",
+    "eccg_relevance": 0.97
+  },
+  {
+    "id": "arxiv-2404.06987",
+    "arxiv_id": "2404.06987",
+    "title": "Spike-Aware Self-Supervised Pretraining for Event-Based Vision",
+    "abstract": "Event-camera data is plentiful but mostly unlabeled. We introduce SpikeMAE, a masked-event autoencoder that pretrains on 1.4 billion unlabeled events from public driving datasets. After fine-tuning, SpikeMAE improves downstream event-based object detection (+4.1 mAP), gesture recognition (+3.2 acc), and optical flow (-0.8 EPE) over from-scratch baselines. We study the interaction between event-rate, masking ratio, and downstream gains and release a public pretraining recipe. Code at github.com/eccg/spike-mae.",
+    "authors": [
+      { "name": "Yiming Zhao" },
+      { "name": "Wei Liu" },
+      { "name": "Cornelia Fermüller" }
+    ],
+    "venue": { "name": "ICCV", "type": "conference", "prestige": 9 },
+    "published_at": "2026-04-09T11:00:00Z",
+    "categories": ["cs.CV"],
+    "pdf_url": "https://arxiv.org/pdf/2404.06987",
+    "html_url": "https://arxiv.org/abs/2404.06987",
+    "citation_count": 9,
+    "influential_citation_count": 1,
+    "months_since_publish": 1.2,
+    "citations_per_month": 7.5,
+    "eccg_category": "recognition",
+    "eccg_relevance": 0.91
+  },
+  {
+    "id": "arxiv-2404.10112",
+    "arxiv_id": "2404.10112",
+    "title": "EventSLAM-GS: Event-Based SLAM with 3D Gaussian Splatting",
+    "abstract": "We present EventSLAM-GS, the first event-based SLAM system that builds a dense 3D Gaussian-splatting map online from a single DVS camera. By coupling event-rate-adaptive tracking with a differentiable Gaussian renderer we recover both pose and a photometrically consistent map without intensity frames. On TUM-VI-EVS our trajectories match frame-based ORB-SLAM3 within 6% RMSE while reconstructing 1.4 M Gaussians at 10 Hz. Source code released.",
+    "authors": [
+      { "name": "Lukas Koestler" },
+      { "name": "Daniel Cremers", "h_index": 95 }
+    ],
+    "venue": { "name": "arXiv preprint", "type": "preprint", "prestige": 3 },
+    "published_at": "2026-04-14T09:00:00Z",
+    "categories": ["cs.CV", "cs.RO"],
+    "pdf_url": "https://arxiv.org/pdf/2404.10112",
+    "html_url": "https://arxiv.org/abs/2404.10112",
+    "citation_count": 6,
+    "influential_citation_count": 1,
+    "months_since_publish": 1.0,
+    "citations_per_month": 6.0,
+    "eccg_category": "slam",
+    "eccg_relevance": 0.96
+  },
+  {
+    "id": "arxiv-2401.05572",
+    "arxiv_id": "2401.05572",
+    "title": "Towards a Tier-1 Spike Camera: 100-kfps Asynchronous Imaging at 6.5 megapixels",
+    "abstract": "We report a 6.5-megapixel spike-driven imaging sensor that emits per-pixel asynchronous spike trains at an effective rate of 100,000 frames/s under daylight illumination. Each pixel uses a Pulse-Frequency-Modulation readout coupled to a 4T charge-domain reset. We characterize dynamic range (>140 dB), motion blur, and end-to-end latency on a drone obstacle-avoidance benchmark and outperform a Prophesee Gen-4 sensor by 18 ms at equal accuracy.",
+    "authors": [
+      { "name": "Zhe Wang" },
+      { "name": "Tiejun Huang", "h_index": 55 }
+    ],
+    "venue": { "name": "Nature Electronics", "type": "journal", "prestige": 10 },
+    "published_at": "2026-01-11T08:00:00Z",
+    "categories": ["cs.AR", "physics.ins-det"],
+    "pdf_url": "https://arxiv.org/pdf/2401.05572",
+    "html_url": "https://arxiv.org/abs/2401.05572",
+    "citation_count": 31,
+    "influential_citation_count": 5,
+    "months_since_publish": 4.2,
+    "citations_per_month": 7.38,
+    "eccg_category": "device_sensor",
+    "eccg_relevance": 0.93
+  },
+  {
+    "id": "arxiv-2405.02244",
+    "arxiv_id": "2405.02244",
+    "title": "v2e-Lite: Energy-Efficient Frame-to-Event Conversion for Edge Deployments",
+    "abstract": "Synthetic event generation from RGB video is widely used to bootstrap event-camera learning, but classical v2e simulators are too slow for on-device pretraining. We present v2e-Lite, an 8-bit quantised frame-to-event simulator that runs at 540 fps on a Jetson Orin Nano while preserving 96% of the event-Jaccard fidelity of the original. We demonstrate downstream gains on three event-based tasks after pretraining with v2e-Lite-generated events.",
+    "authors": [
+      { "name": "Tobi Delbruck", "h_index": 65 },
+      { "name": "Yuhuang Hu" }
+    ],
+    "venue": { "name": "ICRA", "type": "conference", "prestige": 8 },
+    "published_at": "2026-05-04T10:00:00Z",
+    "categories": ["cs.CV"],
+    "pdf_url": "https://arxiv.org/pdf/2405.02244",
+    "html_url": "https://arxiv.org/abs/2405.02244",
+    "citation_count": 3,
+    "influential_citation_count": 0,
+    "months_since_publish": 0.4,
+    "citations_per_month": 7.5,
+    "eccg_category": "simulator",
+    "eccg_relevance": 0.88
+  },
+  {
+    "id": "arxiv-2402.18221",
+    "arxiv_id": "2402.18221",
+    "title": "A Decade of Event-Based Vision: A Survey of 1200 Papers",
+    "abstract": "We survey the past decade of event-based vision, organising 1,200 papers across feature tracking, optical flow, reconstruction, depth, SLAM, segmentation, classification, control, datasets, simulators, and hardware. We trace 38 sub-trends, identify 14 open problems, and provide a dataset taxonomy with download links. This is the first community-driven update to the 2020 TPAMI survey and includes papers up to 2026.",
+    "authors": [
+      { "name": "Guillermo Gallego", "h_index": 50 },
+      { "name": "Tobi Delbruck", "h_index": 65 },
+      { "name": "Garrick Orchard", "h_index": 32 }
+    ],
+    "venue": { "name": "TPAMI", "type": "journal", "prestige": 10 },
+    "published_at": "2026-02-28T12:00:00Z",
+    "categories": ["cs.CV"],
+    "pdf_url": "https://arxiv.org/pdf/2402.18221",
+    "html_url": "https://arxiv.org/abs/2402.18221",
+    "citation_count": 88,
+    "influential_citation_count": 22,
+    "months_since_publish": 2.5,
+    "citations_per_month": 35.2,
+    "eccg_category": "survey",
+    "eccg_relevance": 1.0
+  },
+  {
+    "id": "arxiv-2405.10001",
+    "arxiv_id": "2405.10001",
+    "title": "Neuromorphic Tactile Sensing: A Roadmap",
+    "abstract": "We outline a research roadmap for neuromorphic tactile sensing, drawing parallels to the trajectory of event-based vision. Twelve open challenges are presented around device fabrication, asynchronous read-out, learning algorithms, and benchmark datasets. The roadmap is the output of a 2-day workshop held at the 2026 ECCG meeting.",
+    "authors": [
+      { "name": "Chiara Bartolozzi", "h_index": 35 }
+    ],
+    "venue": { "name": "arXiv preprint", "type": "preprint", "prestige": 3 },
+    "published_at": "2026-05-10T08:00:00Z",
+    "categories": ["cs.NE", "cs.RO"],
+    "pdf_url": "https://arxiv.org/pdf/2405.10001",
+    "html_url": "https://arxiv.org/abs/2405.10001",
+    "citation_count": 0,
+    "influential_citation_count": 0,
+    "months_since_publish": 0.2,
+    "citations_per_month": 0,
+    "eccg_category": "tactile_other",
+    "eccg_relevance": 0.7
+  },
+  {
+    "id": "arxiv-2403.22001",
+    "arxiv_id": "2403.22001",
+    "title": "Differentiable Event Generation for End-to-End Closed-Loop Training",
+    "abstract": "We make the v2e event generation process differentiable, enabling gradient flow from downstream task losses all the way through the synthetic event stream. We apply this to closed-loop optical-flow training and show a 1.4 EPE improvement over teacher-student baselines. Implementation in PyTorch released.",
+    "authors": [
+      { "name": "Damien Joubert" },
+      { "name": "Daniel Gehrig" }
+    ],
+    "venue": { "name": "WACV", "type": "conference", "prestige": 7 },
+    "published_at": "2026-03-30T11:00:00Z",
+    "categories": ["cs.CV"],
+    "pdf_url": "https://arxiv.org/pdf/2403.22001",
+    "html_url": "https://arxiv.org/abs/2403.22001",
+    "citation_count": 11,
+    "influential_citation_count": 2,
+    "months_since_publish": 1.6,
+    "citations_per_month": 6.88,
+    "eccg_category": "optical_flow",
+    "eccg_relevance": 0.85
+  }
+]
